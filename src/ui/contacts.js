@@ -3,6 +3,8 @@ import { debounce } from '../utils/debounce.js';
 import { exportCSV } from '../utils/csv.js';
 import { timeAgo } from '../utils/time.js';
 
+const OPEN_STATUSES = ['OPP', 'proposal_sent', 'negotiation'];
+
 let currentSort = { col: 'last_name', asc: true };
 let currentSearch = '';
 let currentFilter = 'all'; // all | with_email | with_phone | with_company
@@ -32,6 +34,25 @@ async function fetchCompanies() {
   return data || [];
 }
 
+async function fetchOpenDealLinks() {
+  // Get contacts with direct open deals
+  const { data: contactDeals } = await sb.from('deals')
+    .select('contact_id')
+    .in('status', OPEN_STATUSES)
+    .not('contact_id', 'is', null);
+
+  // Get companies with open deals
+  const { data: companyDeals } = await sb.from('deals')
+    .select('company_id')
+    .in('status', OPEN_STATUSES)
+    .not('company_id', 'is', null);
+
+  const contactsWithDeals = new Set((contactDeals || []).map(d => d.contact_id));
+  const companiesWithDeals = new Set((companyDeals || []).map(d => d.company_id));
+
+  return { contactsWithDeals, companiesWithDeals };
+}
+
 function sortIcon(col) {
   if (currentSort.col !== col) return '';
   return currentSort.asc ? ' \u2191' : ' \u2193';
@@ -41,13 +62,37 @@ export async function renderContacts(container) {
   container.innerHTML = '<div class="loading">Loading contacts...</div>';
 
   try {
-    const [contacts, companies] = await Promise.all([fetchContacts(), fetchCompanies()]);
+    const [contacts, companies, openDealLinks] = await Promise.all([
+      fetchContacts(),
+      fetchCompanies(),
+      fetchOpenDealLinks()
+    ]);
+
+    // Group contacts
+    const linkedToOpenDeals = contacts.filter(c =>
+      openDealLinks.contactsWithDeals.has(c.id) ||
+      (c.company_id && openDealLinks.companiesWithDeals.has(c.company_id))
+    ).sort((a, b) => {
+      const lastNameCompare = (a.last_name || '').localeCompare(b.last_name || '');
+      if (lastNameCompare !== 0) return lastNameCompare;
+      return (a.first_name || '').localeCompare(b.first_name || '');
+    });
+
+    const others = contacts.filter(c =>
+      !openDealLinks.contactsWithDeals.has(c.id) &&
+      !(c.company_id && openDealLinks.companiesWithDeals.has(c.company_id))
+    ).sort((a, b) => {
+      const lastNameCompare = (a.last_name || '').localeCompare(b.last_name || '');
+      if (lastNameCompare !== 0) return lastNameCompare;
+      return (a.first_name || '').localeCompare(b.first_name || '');
+    });
 
     container.innerHTML = `
       <div class="page-header">
         <h1>Contacts <span class="badge">${contacts.length}</span></h1>
         <div class="header-actions">
           <button id="csv-export" class="btn btn-secondary">Export CSV</button>
+          <a href="https://www.icloud.com/contacts/" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">🍎 Contacts</a>
           <a href="#/contacts/new" class="btn btn-primary">+ New Contact</a>
         </div>
       </div>
@@ -62,39 +107,7 @@ export async function renderContacts(container) {
         </select>
       </div>
 
-      ${contacts.length === 0
-        ? '<div class="empty-state">No contacts found. <a href="#/contacts/new">Create your first contact</a>.</div>'
-        : `<div class="table-wrap"><table class="data-table">
-        <thead>
-          <tr>
-            <th class="sortable" data-col="last_name">Name${sortIcon('last_name')}</th>
-            <th class="sortable" data-col="email">Email${sortIcon('email')}</th>
-            <th class="sortable" data-col="phone">Phone${sortIcon('phone')}</th>
-            <th>Company</th>
-            <th class="sortable" data-col="created_at">Created${sortIcon('created_at')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${contacts.map(c => `
-            <tr class="clickable-row" data-id="${c.id}">
-              <td><strong>${esc(c.first_name)} ${esc(c.last_name)}</strong></td>
-              <td>${c.email ? `<a href="mailto:${escapeAttr(c.email)}" onclick="event.stopPropagation()">${esc(c.email)}</a>` : '<span class="muted">-</span>'}</td>
-              <td>${c.phone ? esc(c.phone) : '<span class="muted">-</span>'}</td>
-              <td>${c.companies?.name ? esc(c.companies.name) : '<span class="muted">-</span>'}</td>
-              <td>${timeAgo(c.created_at)}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table></div>`}
-
-      <div class="stats-sidebar">
-        <h3>Quick Stats</h3>
-        <div class="stat-item">Total: <strong>${contacts.length}</strong></div>
-        <div class="stat-item">With email: <strong>${contacts.filter(c => c.email).length}</strong></div>
-        <div class="stat-item">With phone: <strong>${contacts.filter(c => c.phone).length}</strong></div>
-        <div class="stat-item">With company: <strong>${contacts.filter(c => c.company_id).length}</strong></div>
-        <div class="stat-item">With notes: <strong>${contacts.filter(c => c.notes).length}</strong></div>
-      </div>
+      ${renderGroupedContacts(linkedToOpenDeals, others)}
     `;
 
     // Event listeners
@@ -141,6 +154,65 @@ export async function renderContacts(container) {
   } catch (err) {
     container.innerHTML = `<div class="error">Error: ${esc(err.message)}</div>`;
   }
+}
+
+function renderGroupedContacts(linkedToOpenDeals, others) {
+  let html = '';
+
+  // Group 1: Contacts linked to open deals
+  if (linkedToOpenDeals.length > 0) {
+    html += `
+      <div class="deal-group">
+        <h2 class="group-heading">Open Deals <span class="badge">${linkedToOpenDeals.length}</span></h2>
+        ${renderContactTable(linkedToOpenDeals)}
+      </div>
+    `;
+  }
+
+  // Group 2: All other contacts
+  if (others.length > 0) {
+    html += `
+      <div class="deal-group">
+        <h2 class="group-heading">Other <span class="badge">${others.length}</span></h2>
+        ${renderContactTable(others)}
+      </div>
+    `;
+  }
+
+  if (linkedToOpenDeals.length === 0 && others.length === 0) {
+    html = '<div class="empty-state">No contacts. <a href="#/contacts/new">Create first</a>.</div>';
+  }
+
+  return html;
+}
+
+function renderContactTable(contacts) {
+  return `
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th class="sortable" data-col="last_name">Name${sortIcon('last_name')}</th>
+            <th class="sortable" data-col="email">Email${sortIcon('email')}</th>
+            <th class="sortable" data-col="phone">Phone${sortIcon('phone')}</th>
+            <th>Co</th>
+            <th class="sortable" data-col="created_at">Add${sortIcon('created_at')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${contacts.map(c => `
+            <tr class="clickable-row" data-id="${c.id}">
+              <td><strong>${esc(c.first_name)} ${esc(c.last_name)}</strong></td>
+              <td>${c.email ? `<a href="mailto:${escapeAttr(c.email)}" onclick="event.stopPropagation()">${esc(c.email)}</a>` : '<span class="muted">-</span>'}</td>
+              <td>${c.phone ? esc(c.phone) : '<span class="muted">-</span>'}</td>
+              <td>${c.companies?.name ? esc(c.companies.name) : '<span class="muted">-</span>'}</td>
+              <td>${timeAgo(c.created_at)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 function esc(s) {

@@ -40,6 +40,21 @@ CREATE TABLE IF NOT EXISTS activities (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- 4. Deals table
+CREATE TABLE IF NOT EXISTS deals (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  title             text NOT NULL,
+  amount            numeric(12,2),
+  status            text NOT NULL DEFAULT 'lead', -- lead, proposal, negotiation, won, lost
+  expected_close    date,
+  contact_id        uuid REFERENCES contacts(id) ON DELETE SET NULL,
+  company_id        uuid REFERENCES companies(id) ON DELETE SET NULL,
+  notes             text,
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  updated_at        timestamptz NOT NULL DEFAULT now()
+);
+
 -- =============================================================
 -- Indexes
 -- =============================================================
@@ -51,6 +66,10 @@ CREATE INDEX IF NOT EXISTS idx_contacts_last_name   ON contacts(user_id, last_na
 CREATE INDEX IF NOT EXISTS idx_contacts_email       ON contacts(user_id, email);
 CREATE INDEX IF NOT EXISTS idx_activities_user_id   ON activities(user_id);
 CREATE INDEX IF NOT EXISTS idx_activities_contact   ON activities(contact_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_deals_user_id        ON deals(user_id);
+CREATE INDEX IF NOT EXISTS idx_deals_contact_id     ON deals(contact_id);
+CREATE INDEX IF NOT EXISTS idx_deals_company_id     ON deals(company_id);
+CREATE INDEX IF NOT EXISTS idx_deals_status         ON deals(user_id, status);
 
 -- =============================================================
 -- Row Level Security
@@ -59,6 +78,7 @@ CREATE INDEX IF NOT EXISTS idx_activities_contact   ON activities(contact_id, cr
 ALTER TABLE companies  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contacts   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE activities ENABLE ROW LEVEL SECURITY;
+ALTER TABLE deals      ENABLE ROW LEVEL SECURITY;
 
 -- Companies policies
 CREATE POLICY "companies_select" ON companies
@@ -99,6 +119,19 @@ CREATE POLICY "activities_update" ON activities
 CREATE POLICY "activities_delete" ON activities
   FOR DELETE USING (user_id = auth.uid());
 
+-- Deals policies
+CREATE POLICY "deals_select" ON deals
+  FOR SELECT USING (user_id = auth.uid());
+
+CREATE POLICY "deals_insert" ON deals
+  FOR INSERT WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "deals_update" ON deals
+  FOR UPDATE USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "deals_delete" ON deals
+  FOR DELETE USING (user_id = auth.uid());
+
 -- =============================================================
 -- Auto-update updated_at trigger
 -- =============================================================
@@ -117,4 +150,8 @@ CREATE TRIGGER companies_updated_at
 
 CREATE TRIGGER contacts_updated_at
   BEFORE UPDATE ON contacts
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER deals_updated_at
+  BEFORE UPDATE ON deals
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();

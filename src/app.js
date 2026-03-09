@@ -1,9 +1,14 @@
-import { getUser, onAuthChange, signOut } from './supabase.js';
+import { sb, getUser, onAuthChange, signOut } from './supabase.js';
 import { renderLogin } from './ui/auth.js';
 import { renderContacts } from './ui/contacts.js';
 import { renderContactDetail } from './ui/contactDetail.js';
 import { renderContactForm } from './ui/contactForm.js';
 import { renderCompanies } from './ui/companies.js';
+import { renderCompanyDetail } from './ui/companyDetail.js';
+import { renderCompanyForm } from './ui/companyForm.js';
+import { renderDeals } from './ui/deals.js';
+import { renderDealDetail } from './ui/dealDetail.js';
+import { renderDealForm } from './ui/dealForm.js';
 
 const app = document.getElementById('app');
 let currentUser = null;
@@ -24,7 +29,7 @@ async function route() {
   }
 
   document.getElementById('nav').style.display = '';
-  renderNav();
+  await renderNav();
 
   const parts = parseHash();
 
@@ -34,21 +39,51 @@ async function route() {
     await renderContactForm(app, parts[1]);
   } else if (parts[0] === 'contacts' && parts[1]) {
     await renderContactDetail(app, parts[1]);
+  } else if (parts[0] === 'companies' && parts[1] === 'new') {
+    await renderCompanyForm(app);
+  } else if (parts[0] === 'companies' && parts[1] && parts[2] === 'edit') {
+    await renderCompanyForm(app, parts[1]);
+  } else if (parts[0] === 'companies' && parts[1]) {
+    await renderCompanyDetail(app, parts[1]);
   } else if (parts[0] === 'companies') {
     await renderCompanies(app);
+  } else if (parts[0] === 'deals' && parts[1] === 'new') {
+    await renderDealForm(app);
+  } else if (parts[0] === 'deals' && parts[1] && parts[2] === 'edit') {
+    await renderDealForm(app, parts[1]);
+  } else if (parts[0] === 'deals' && parts[1]) {
+    await renderDealDetail(app, parts[1]);
+  } else if (parts[0] === 'deals') {
+    await renderDeals(app);
   } else {
     // Default: contacts list
     await renderContacts(app);
   }
 }
 
-function renderNav() {
+async function renderNav() {
   const nav = document.getElementById('nav');
   const hash = window.location.hash || '#/';
+
+  // Get open deals sum
+  let dealsSumText = '';
+  try {
+    const { data: openDeals } = await sb.from('deals')
+      .select('amount')
+      .in('status', ['OPP', 'proposal_sent', 'negotiation']);
+
+    const totalAmount = (openDeals || []).reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+    const totalInK = Math.round(totalAmount / 1000);
+    dealsSumText = ` (${totalInK}k)`;
+  } catch (err) {
+    dealsSumText = '';
+  }
+
   nav.innerHTML = `
     <div class="nav-inner">
       <div class="nav-left">
         <a href="#/" class="nav-brand">CRM Mini</a>
+        <a href="#/deals" class="nav-link${hash.startsWith('#/deals') ? ' active' : ''}">Deals${dealsSumText}</a>
         <a href="#/contacts" class="nav-link${hash.startsWith('#/contacts') || hash === '#/' || hash === '#' ? ' active' : ''}">Contacts</a>
         <a href="#/companies" class="nav-link${hash.startsWith('#/companies') ? ' active' : ''}">Companies</a>
       </div>

@@ -57,7 +57,10 @@ export async function renderContactForm(container, id = null) {
             </select>
           </div>
           <div class="form-group">
-            <label for="notes">Notes</label>
+            <div class="label-with-action">
+              <label for="notes">Notes</label>
+              <button type="button" id="add-timestamp-btn" class="btn btn-sm btn-secondary">Add timestamp</button>
+            </div>
             <textarea id="notes" class="input" rows="4">${esc(contact.notes || '')}</textarea>
           </div>
           <div class="form-actions">
@@ -68,6 +71,24 @@ export async function renderContactForm(container, id = null) {
         </form>
       </div>
     `;
+
+    // Add timestamp button
+    container.querySelector('#add-timestamp-btn').addEventListener('click', () => {
+      const textarea = container.querySelector('#notes');
+      const timestamp = formatTimestamp(new Date());
+      const cursorPos = textarea.selectionStart;
+      const textBefore = textarea.value.substring(0, cursorPos);
+      const textAfter = textarea.value.substring(cursorPos);
+
+      // Insert timestamp at cursor position (or append)
+      const newText = textBefore + (textBefore && !textBefore.endsWith('\n') ? '\n' : '') + timestamp + '\n' + textAfter;
+      textarea.value = newText;
+
+      // Move cursor after timestamp
+      const newCursorPos = textBefore.length + (textBefore && !textBefore.endsWith('\n') ? 1 : 0) + timestamp.length + 1;
+      textarea.focus();
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+    });
 
     container.querySelector('#contact-form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -148,6 +169,13 @@ function clearErrors(container) {
 
 function isValidEmail(e) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+}
+
+function formatTimestamp(date) {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}.${month}.${year}`;
 }
 
 function esc(s) {
