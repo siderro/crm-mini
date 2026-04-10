@@ -6,6 +6,7 @@ import { renderContactForm } from './ui/contactForm.js';
 import { renderCompanies } from './ui/companies.js';
 import { renderCompanyDetail } from './ui/companyDetail.js';
 import { renderCompanyForm } from './ui/companyForm.js';
+import { renderInbox } from './ui/inbox.js';
 import { renderDeals } from './ui/deals.js';
 import { renderDealDetail } from './ui/dealDetail.js';
 import { renderDealForm } from './ui/dealForm.js';
@@ -47,6 +48,8 @@ async function route() {
     await renderCompanyDetail(app, parts[1]);
   } else if (parts[0] === 'companies') {
     await renderCompanies(app);
+  } else if (parts[0] === 'inbox') {
+    await renderInbox(app, currentUser);
   } else if (parts[0] === 'deals' && parts[1] === 'new') {
     await renderDealForm(app);
   } else if (parts[0] === 'deals' && parts[1] && parts[2] === 'edit') {
@@ -83,6 +86,7 @@ async function renderNav() {
     <div class="nav-inner">
       <div class="nav-left">
         <a href="#/" class="nav-brand">CRM Mini</a>
+        <a href="#/inbox" class="nav-link${hash.startsWith('#/inbox') ? ' active' : ''}">Inbox</a>
         <a href="#/deals" class="nav-link${hash.startsWith('#/deals') ? ' active' : ''}">Deals${dealsSumText}</a>
         <a href="#/contacts" class="nav-link${hash.startsWith('#/contacts') || hash === '#/' || hash === '#' ? ' active' : ''}">Contacts</a>
         <a href="#/companies" class="nav-link${hash.startsWith('#/companies') ? ' active' : ''}">Companies</a>

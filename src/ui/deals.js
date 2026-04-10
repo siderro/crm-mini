@@ -1,5 +1,6 @@
 import { sb } from '../supabase.js';
 import { timeAgo } from '../utils/time.js';
+import { deleteWithUndo } from '../utils/undo.js';
 
 // Define status groups and labels
 const OPEN_STATUSES = ['OPP', 'proposal_sent', 'negotiation'];
@@ -40,16 +41,15 @@ export async function renderDeals(container) {
 
     // Calculate stats
     const totalValue = list.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
-    const openDeals = list.filter(d => OPEN_STATUSES.includes(d.status));
-    const wonDeals = list.filter(d => d.status === 'won_done' || d.status === 'won_wip');
-    const wonValue = wonDeals.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+    const frozenDeals = list.filter(d => d.status === 'frozen');
+    const frozenValue = frozenDeals.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
 
     // Group deals by status
     const groupedDeals = groupDealsByStatus(list);
 
     container.innerHTML = `
       <div class="page-header">
-        <h1>Deals <span class="badge">${list.length}</span></h1>
+        <h1>Deals <span class="badge">${list.length}</span> <span class="header-meta">Total ${totalValue.toLocaleString('cs-CZ')} Kč / Frozen ${frozenValue.toLocaleString('cs-CZ')} Kč</span></h1>
         <div class="header-actions">
           <button id="add-deal-btn" class="btn btn-primary">+ New Deal</button>
         </div>
@@ -115,17 +115,7 @@ export async function renderDeals(container) {
         </form>
       </div>
 
-      <div class="stats-sidebar">
-        <h3>Stats</h3>
-        <div class="stat-item">Tot: <strong>${list.length}</strong></div>
-        <div class="stat-item">Val: <strong>$${totalValue.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</strong></div>
-        <div class="stat-item">Open: <strong>${openDeals.length}</strong></div>
-        <div class="stat-item">Won: <strong>${wonDeals.length}</strong> ($${wonValue.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})})</div>
-        <div class="stat-item">Frz: <strong>${list.filter(d => d.status === 'frozen').length}</strong></div>
-        <div class="stat-item">Lost: <strong>${list.filter(d => d.status === 'lost').length}</strong></div>
-      </div>
-
-      ${renderGroupedDeals(groupedDeals)}
+      ${renderGroupedDeals(groupedDeals, list)}
     `;
 
     const formWrap = container.querySelector('#deal-form-wrap');
@@ -188,27 +178,32 @@ export async function renderDeals(container) {
       }
     });
 
-    // Edit buttons
+    // Edit links
     container.querySelectorAll('.edit-deal').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
         const d = list.find(x => x.id === btn.dataset.id);
         if (d) showForm(d);
       });
     });
 
-    // Delete buttons
+    // Delete links
     container.querySelectorAll('.delete-deal').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        if (!confirm(`Delete deal "${btn.dataset.title}"?`)) return;
-        const { error } = await sb.from('deals').delete().eq('id', btn.dataset.id);
-        if (error) { alert('Error: ' + error.message); return; }
-        await renderDeals(container);
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const d = list.find(x => x.id === btn.dataset.id);
+        if (!d) return;
+        await deleteWithUndo('deals', d, `"${d.title}"`,
+          () => renderDeals(container),
+          () => renderDeals(container)
+        );
       });
     });
 
-    // Freeze buttons
+    // Freeze links
     container.querySelectorAll('.freeze-deal').forEach(btn => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
         const dealId = btn.dataset.id;
         const currentStatus = btn.dataset.status;
         const { error } = await sb.from('deals')
@@ -219,9 +214,10 @@ export async function renderDeals(container) {
       });
     });
 
-    // Unfreeze buttons
+    // Unfreeze links
     container.querySelectorAll('.unfreeze-deal').forEach(btn => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
         const dealId = btn.dataset.id;
         const previousStatus = btn.dataset.previous || 'OPP';
         const { error } = await sb.from('deals')
@@ -259,26 +255,28 @@ function groupDealsByStatus(deals) {
   return grouped;
 }
 
-function renderGroupedDeals(groupedDeals) {
+function renderGroupedDeals(groupedDeals, allDeals) {
+  const maxValue = Math.max(...allDeals.map(d => parseFloat(d.amount) || 0), 1);
+
   return Object.values(groupedDeals).map(group => {
-    if (group.deals.length === 0) return ''; // Hide empty groups
+    if (group.deals.length === 0) return '';
 
     return `
       <div class="deal-group">
         <h2 class="group-heading">${group.title} <span class="badge">${group.deals.length}</span></h2>
         <div class="table-wrap">
-          <table class="data-table">
+          <table class="data-table table-deals">
             <thead>
               <tr>
                 <th>Deal</th>
-                <th>%</th>
-                <th>Val</th>
-                <th>Add/Mod</th>
-                <th>Act</th>
+                <th>Status</th>
+                <th>Value</th>
+                <th>Created/Updated</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              ${group.deals.map(d => renderDealRow(d)).join('')}
+              ${group.deals.map(d => renderDealRow(d, maxValue)).join('')}
             </tbody>
           </table>
         </div>
@@ -287,28 +285,29 @@ function renderGroupedDeals(groupedDeals) {
   }).join('');
 }
 
-function renderDealRow(d) {
-  const percentage = getStatusPercentage(d.status);
+function renderDealRow(d, maxValue) {
   const createdDays = getDaysAgo(d.created_at);
   const modifiedDays = getDaysAgo(d.updated_at);
-  const amount = d.amount ? parseFloat(d.amount).toLocaleString('cs-CZ', {minimumFractionDigits: 0, maximumFractionDigits: 0}) : '0';
+  const amountNum = parseFloat(d.amount) || 0;
+  const amount = amountNum.toLocaleString('cs-CZ', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+  const valuePct = maxValue > 0 ? (amountNum / maxValue) * 100 : 0;
 
   const isOpenStatus = OPEN_STATUSES.includes(d.status);
   const isFrozen = d.status === 'frozen';
 
-  const progressBar = renderTextProgressBar(percentage);
+  const statusLabel = STATUS_LABELS[d.status] || d.status;
+  const progressBar = renderTextProgressBar(valuePct);
 
   return `
     <tr class="clickable-row" data-id="${d.id}">
       <td><strong>${esc(d.title)}</strong></td>
-      <td><span class="text-progress-bar">${progressBar}</span></td>
-      <td>${amount} Kč</td>
+      <td>${statusLabel}</td>
+      <td><span class="text-progress-bar">${progressBar}</span> ${amount} Kč</td>
       <td>(${createdDays}d / ${modifiedDays}d)</td>
       <td class="actions-cell" onclick="event.stopPropagation()">
-        <button class="btn btn-sm btn-secondary edit-deal" data-id="${d.id}">E</button>
-        ${isOpenStatus ? `<button class="btn btn-sm btn-freeze freeze-deal" data-id="${d.id}" data-status="${d.status}">❄️</button>` : ''}
-        ${isFrozen ? `<button class="btn btn-sm btn-success unfreeze-deal" data-id="${d.id}" data-previous="${d.previous_status || 'OPP'}">↑</button>` : ''}
-        <button class="btn btn-sm btn-danger delete-deal" data-id="${d.id}" data-title="${escapeAttr(d.title)}">Del</button>
+        ${isOpenStatus ? `<a href="#" class="freeze-deal" data-id="${d.id}" data-status="${d.status}">Freeze</a>` : ''}
+        ${isFrozen ? `<a href="#" class="unfreeze-deal" data-id="${d.id}" data-previous="${d.previous_status || 'OPP'}">Unfreeze</a>` : ''}
+        <a href="#" class="danger-link delete-deal" data-id="${d.id}" data-title="${escapeAttr(d.title)}">Delete</a>
       </td>
     </tr>
   `;
@@ -326,19 +325,6 @@ function escapeAttr(s) {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function getStatusPercentage(status) {
-  const percentages = {
-    'OPP': 1.2,
-    'proposal_sent': 25,
-    'negotiation': 60,
-    'frozen': 0,
-    'won_wip': 90,
-    'won_done': 100,
-    'lost': 0
-  };
-  return percentages[status] || 0;
-}
-
 function getDaysAgo(dateStr) {
   if (!dateStr) return 0;
   const date = new Date(dateStr);
@@ -349,12 +335,13 @@ function getDaysAgo(dateStr) {
 }
 
 function renderTextProgressBar(percentage) {
+  const pct = Math.round(percentage);
   const totalBlocks = 10;
-  const filledBlocks = Math.round((percentage / 100) * totalBlocks);
+  const filledBlocks = Math.round((pct / 100) * totalBlocks);
   const emptyBlocks = totalBlocks - filledBlocks;
 
   const filled = '█'.repeat(filledBlocks);
   const empty = '░'.repeat(emptyBlocks);
 
-  return `${filled}${empty} ${percentage}%`;
+  return `${filled}${empty}`;
 }

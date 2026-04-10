@@ -1,5 +1,6 @@
 import { sb } from '../supabase.js';
 import { timeAgo } from '../utils/time.js';
+import { deleteWithUndo } from '../utils/undo.js';
 
 const OPEN_STATUSES = ['OPP', 'proposal_sent', 'negotiation'];
 
@@ -148,10 +149,10 @@ export async function renderDealDetail(container, id) {
 
     // Delete deal
     container.querySelector('#delete-deal').addEventListener('click', async () => {
-      if (!confirm(`Delete "${deal.title}"? This cannot be undone.`)) return;
-      const { error: delErr } = await sb.from('deals').delete().eq('id', id);
-      if (delErr) { alert('Error: ' + delErr.message); return; }
-      window.location.hash = '#/deals';
+      await deleteWithUndo('deals', deal, `"${deal.title}"`,
+        () => { window.location.hash = '#/deals'; },
+        () => { window.location.hash = `#/deals/${id}`; }
+      );
     });
 
   } catch (err) {

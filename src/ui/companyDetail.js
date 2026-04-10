@@ -1,5 +1,6 @@
 import { sb } from '../supabase.js';
 import { timeAgo } from '../utils/time.js';
+import { deleteWithUndo } from '../utils/undo.js';
 
 export async function renderCompanyDetail(container, id) {
   container.innerHTML = '<div class="loading">Loading...</div>';
@@ -90,10 +91,10 @@ export async function renderCompanyDetail(container, id) {
 
     // Delete company
     container.querySelector('#delete-company').addEventListener('click', async () => {
-      if (!confirm(`Delete "${company.name}"?`)) return;
-      const { error: delErr } = await sb.from('companies').delete().eq('id', id);
-      if (delErr) { alert('Error: ' + delErr.message); return; }
-      window.location.hash = '#/companies';
+      await deleteWithUndo('companies', company, `"${company.name}"`,
+        () => { window.location.hash = '#/companies'; },
+        () => { window.location.hash = `#/companies/${id}`; }
+      );
     });
 
     // Edit company

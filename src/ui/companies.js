@@ -1,4 +1,5 @@
 import { sb } from '../supabase.js';
+import { deleteWithUndo } from '../utils/undo.js';
 
 const OPEN_STATUSES = ['OPP', 'proposal_sent', 'negotiation'];
 
@@ -144,21 +145,25 @@ export async function renderCompanies(container) {
       }
     });
 
-    // Edit buttons
+    // Edit links
     container.querySelectorAll('.edit-company').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
         const c = list.find(x => x.id === btn.dataset.id);
         if (c) showForm(c);
       });
     });
 
-    // Delete buttons
+    // Delete links
     container.querySelectorAll('.delete-company').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        if (!confirm(`Delete company "${btn.dataset.name}"?`)) return;
-        const { error } = await sb.from('companies').delete().eq('id', btn.dataset.id);
-        if (error) { alert('Error: ' + error.message); return; }
-        await renderCompanies(container);
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const c = list.find(x => x.id === btn.dataset.id);
+        if (!c) return;
+        await deleteWithUndo('companies', c, `"${c.name}"`,
+          () => renderCompanies(container),
+          () => renderCompanies(container)
+        );
       });
     });
 
@@ -183,17 +188,17 @@ function renderGroupedCompanies(withOpenDeals, others, openDealsByCompany) {
       <div class="deal-group">
         <h2 class="group-heading">Open Deals <span class="badge">${withOpenDeals.length}</span></h2>
         <div class="table-wrap">
-          <table class="data-table">
+          <table class="data-table table-companies">
             <thead>
               <tr>
                 <th>Name</th>
-                <th>Off</th>
+                <th>Official</th>
                 <th>Email</th>
                 <th>Web</th>
                 <th>IČO</th>
-                <th>C</th>
-                <th>OD</th>
-                <th>Act</th>
+                <th>Contacts</th>
+                <th>Open Deals</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -211,16 +216,16 @@ function renderGroupedCompanies(withOpenDeals, others, openDealsByCompany) {
       <div class="deal-group">
         <h2 class="group-heading">Other <span class="badge">${others.length}</span></h2>
         <div class="table-wrap">
-          <table class="data-table">
+          <table class="data-table table-companies">
             <thead>
               <tr>
                 <th>Name</th>
-                <th>Off</th>
+                <th>Official</th>
                 <th>Email</th>
                 <th>Web</th>
                 <th>IČO</th>
-                <th>C</th>
-                <th>Act</th>
+                <th>Contacts</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -250,8 +255,8 @@ function renderCompanyRow(c, openDealsCount) {
       <td>${c.contacts ? c.contacts.length : 0}</td>
       ${openDealsCount > 0 ? `<td><strong>${openDealsCount}</strong></td>` : ''}
       <td class="actions-cell" onclick="event.stopPropagation()">
-        <button class="btn btn-sm btn-secondary edit-company" data-id="${c.id}">E</button>
-        <button class="btn btn-sm btn-danger delete-company" data-id="${c.id}" data-name="${escapeAttr(c.name)}">Del</button>
+        <a href="#" class="edit-company" data-id="${c.id}">Edit</a>
+        <a href="#" class="danger-link delete-company" data-id="${c.id}" data-name="${escapeAttr(c.name)}">Delete</a>
       </td>
     </tr>
   `;

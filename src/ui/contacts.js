@@ -189,14 +189,14 @@ function renderGroupedContacts(linkedToOpenDeals, others) {
 function renderContactTable(contacts) {
   return `
     <div class="table-wrap">
-      <table class="data-table">
+      <table class="data-table table-contacts">
         <thead>
           <tr>
             <th class="sortable" data-col="last_name">Name${sortIcon('last_name')}</th>
             <th class="sortable" data-col="email">Email${sortIcon('email')}</th>
             <th class="sortable" data-col="phone">Phone${sortIcon('phone')}</th>
-            <th>Co</th>
-            <th class="sortable" data-col="created_at">Add${sortIcon('created_at')}</th>
+            <th>Company</th>
+            <th class="sortable" data-col="created_at">Added${sortIcon('created_at')}</th>
           </tr>
         </thead>
         <tbody>
