@@ -97,17 +97,26 @@ export async function renderContacts(container) {
         </div>
       </div>
 
-      <div class="toolbar">
-        <input type="search" id="search-input" class="input" placeholder="Search name, email, notes..." value="${escapeAttr(currentSearch)}">
-        <select id="filter-select" class="input">
-          <option value="all"${currentFilter === 'all' ? ' selected' : ''}>All contacts</option>
-          <option value="with_email"${currentFilter === 'with_email' ? ' selected' : ''}>With email</option>
-          <option value="with_phone"${currentFilter === 'with_phone' ? ' selected' : ''}>With phone</option>
-          <option value="with_company"${currentFilter === 'with_company' ? ' selected' : ''}>With company</option>
-        </select>
-      </div>
+      <div class="contacts-layout">
+        <div class="contacts-main">
+          <div class="toolbar">
+            <input type="search" id="search-input" class="input" placeholder="Search name, email, notes..." value="${escapeAttr(currentSearch)}">
+            <select id="filter-select" class="input">
+              <option value="all"${currentFilter === 'all' ? ' selected' : ''}>All contacts</option>
+              <option value="with_email"${currentFilter === 'with_email' ? ' selected' : ''}>With email</option>
+              <option value="with_phone"${currentFilter === 'with_phone' ? ' selected' : ''}>With phone</option>
+              <option value="with_company"${currentFilter === 'with_company' ? ' selected' : ''}>With company</option>
+            </select>
+          </div>
 
-      ${renderGroupedContacts(linkedToOpenDeals, others)}
+          ${renderGroupedContacts(linkedToOpenDeals, others)}
+        </div>
+
+        <div class="contacts-sidebar">
+          <h2 class="group-heading">Starred <span class="badge">0</span></h2>
+          <div class="empty-state muted">No starred contacts yet.</div>
+        </div>
+      </div>
     `;
 
     // Event listeners
@@ -196,7 +205,6 @@ function renderContactTable(contacts) {
             <th class="sortable" data-col="email">Email${sortIcon('email')}</th>
             <th class="sortable" data-col="phone">Phone${sortIcon('phone')}</th>
             <th>Company</th>
-            <th class="sortable" data-col="created_at">Added${sortIcon('created_at')}</th>
           </tr>
         </thead>
         <tbody>
@@ -206,7 +214,6 @@ function renderContactTable(contacts) {
               <td>${c.email ? `<a href="mailto:${escapeAttr(c.email)}" onclick="event.stopPropagation()">${esc(c.email)}</a>` : '<span class="muted">-</span>'}</td>
               <td>${c.phone ? esc(c.phone) : '<span class="muted">-</span>'}</td>
               <td>${c.companies?.name ? esc(c.companies.name) : '<span class="muted">-</span>'}</td>
-              <td>${timeAgo(c.created_at)}</td>
             </tr>
           `).join('')}
         </tbody>

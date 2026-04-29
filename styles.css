@@ -583,6 +583,25 @@ textarea.input { resize: vertical; }
   background: #55ffff;
 }
 
+/* ── Contacts Layout (2/3 + 1/3) ── */
+.contacts-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+.contacts-main { min-width: 0; }
+.contacts-sidebar {
+  border: 1px solid var(--border);
+  padding: 0.75rem;
+  background: var(--surface);
+}
+.contacts-sidebar .group-heading {
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--text);
+}
+
 /* ── Responsive ── */
 @media (max-width: 640px) {
   #app { padding: 1rem; }
@@ -595,4 +614,5 @@ textarea.input { resize: vertical; }
   .info-grid { grid-template-columns: 1fr; }
   .activity-input-row { flex-direction: column; }
   .activity-input-row select { width: 100%; }
+  .contacts-layout { grid-template-columns: 1fr; }
 }

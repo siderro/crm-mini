@@ -1,0 +1,14 @@
+{
+  "name": "crm-mini",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --open",
+    "start": "npm run dev",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^6"
+  }
+}
