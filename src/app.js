@@ -73,11 +73,11 @@ async function renderNav() {
   try {
     const { data: openDeals } = await sb.from('deals')
       .select('amount')
-      .in('status', ['OPP', 'proposal_sent', 'negotiation']);
+      .in('status', ['open']);
 
     const totalAmount = (openDeals || []).reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
     const totalInK = Math.round(totalAmount / 1000);
-    dealsSumText = ` (${totalInK}k)`;
+    if (totalInK > 0) dealsSumText = ` (${totalInK}k)`;
   } catch (err) {
     dealsSumText = '';
   }

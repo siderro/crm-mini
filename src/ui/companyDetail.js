@@ -120,12 +120,9 @@ export async function renderCompanyDetail(container, id) {
 
 function getStatusLabel(status) {
   const labels = {
-    'OPP': 'OPP',
-    'proposal_sent': 'Proposal',
-    'negotiation': 'Negotiation',
+    'open': 'Open',
     'frozen': 'Frozen',
-    'won_wip': 'Won(WIP)',
-    'won_done': 'Won',
+    'won': 'Won',
     'lost': 'Lost'
   };
   return labels[status] || status;

@@ -1,7 +1,7 @@
 import { sb } from '../supabase.js';
 import { deleteWithUndo } from '../utils/undo.js';
 
-const OPEN_STATUSES = ['OPP', 'proposal_sent', 'negotiation'];
+const OPEN_STATUSES = ['open'];
 
 export async function renderCompanies(container) {
   container.innerHTML = '<div class="loading">Loading companies...</div>';

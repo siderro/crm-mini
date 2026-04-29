@@ -2,7 +2,7 @@ import { sb } from '../supabase.js';
 import { timeAgo } from '../utils/time.js';
 import { deleteWithUndo } from '../utils/undo.js';
 
-const OPEN_STATUSES = ['OPP', 'proposal_sent', 'negotiation'];
+const OPEN_STATUSES = ['open'];
 
 export async function renderContactDetail(container, id) {
   container.innerHTML = '<div class="loading">Loading...</div>';

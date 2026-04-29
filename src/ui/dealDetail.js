@@ -2,7 +2,7 @@ import { sb } from '../supabase.js';
 import { timeAgo } from '../utils/time.js';
 import { deleteWithUndo } from '../utils/undo.js';
 
-const OPEN_STATUSES = ['OPP', 'proposal_sent', 'negotiation'];
+const OPEN_STATUSES = ['open'];
 
 export async function renderDealDetail(container, id) {
   container.innerHTML = '<div class="loading">Loading...</div>';
@@ -122,7 +122,7 @@ export async function renderDealDetail(container, id) {
     if (freezeBtn) {
       freezeBtn.addEventListener('click', async () => {
         const { error } = await sb.from('deals')
-          .update({ status: 'frozen', previous_status: deal.status })
+          .update({ status: 'frozen' })
           .eq('id', id);
         if (error) { alert('Error: ' + error.message); return; }
         await renderDealDetail(container, id);
@@ -133,9 +133,8 @@ export async function renderDealDetail(container, id) {
     const unfreezeBtn = container.querySelector('#unfreeze-deal');
     if (unfreezeBtn) {
       unfreezeBtn.addEventListener('click', async () => {
-        const previousStatus = deal.previous_status || 'OPP';
         const { error } = await sb.from('deals')
-          .update({ status: previousStatus, previous_status: null })
+          .update({ status: 'open' })
           .eq('id', id);
         if (error) { alert('Error: ' + error.message); return; }
         await renderDealDetail(container, id);
@@ -162,12 +161,9 @@ export async function renderDealDetail(container, id) {
 
 function getStatusLabel(status) {
   const labels = {
-    'OPP': 'OPP',
-    'proposal_sent': 'Proposal',
-    'negotiation': 'Negotiation',
+    'open': 'Open',
     'frozen': 'Frozen',
-    'won_wip': 'Won(WIP)',
-    'won_done': 'Won',
+    'won': 'Won',
     'lost': 'Lost'
   };
   return labels[status] || status;

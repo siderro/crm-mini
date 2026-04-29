@@ -3,7 +3,7 @@ import { debounce } from '../utils/debounce.js';
 import { exportCSV } from '../utils/csv.js';
 import { timeAgo } from '../utils/time.js';
 
-const OPEN_STATUSES = ['OPP', 'proposal_sent', 'negotiation'];
+const OPEN_STATUSES = ['open'];
 
 let currentSort = { col: 'last_name', asc: true };
 let currentSearch = '';

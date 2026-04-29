@@ -424,10 +424,8 @@ textarea.input { resize: vertical; }
   letter-spacing: 0.03em;
   border: 1px solid;
 }
-.status-lead, .status-OPP { background: var(--surface); color: var(--primary); border-color: var(--primary); }
-.status-proposal, .status-proposal_sent { background: var(--surface); color: var(--warning); border-color: var(--warning); }
-.status-negotiation { background: var(--surface); color: var(--magenta); border-color: var(--magenta); }
-.status-won, .status-won_wip, .status-won_done { background: var(--surface); color: var(--success); border-color: var(--success); }
+.status-open { background: var(--surface); color: var(--primary); border-color: var(--primary); }
+.status-won { background: var(--surface); color: var(--success); border-color: var(--success); }
 .status-lost { background: var(--surface); color: var(--danger); border-color: var(--danger); }
 .status-frozen { background: var(--surface); color: var(--cyan); border-color: var(--cyan); }
 

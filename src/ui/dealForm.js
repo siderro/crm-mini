@@ -1,12 +1,9 @@
 import { sb } from '../supabase.js';
 
 const STATUS_OPTIONS = [
-  { value: 'OPP', label: 'OPP' },
-  { value: 'proposal_sent', label: 'Proposal sent' },
-  { value: 'negotiation', label: 'Negotiation' },
+  { value: 'open', label: 'Open' },
   { value: 'frozen', label: 'Frozen' },
-  { value: 'won_wip', label: 'Won (WIP)' },
-  { value: 'won_done', label: 'Won (Done)' },
+  { value: 'won', label: 'Won' },
   { value: 'lost', label: 'Lost' }
 ];
 
@@ -14,7 +11,7 @@ export async function renderDealForm(container, id = null) {
   container.innerHTML = '<div class="loading">Loading...</div>';
 
   const isEdit = !!id;
-  let deal = { title: '', amount: '', status: 'OPP', expected_close: '', contact_id: '', company_id: '', notes: '' };
+  let deal = { title: '', amount: '', status: 'open', expected_close: '', contact_id: '', company_id: '', notes: '' };
 
   try {
     const [

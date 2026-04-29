@@ -3,23 +3,19 @@ import { timeAgo } from '../utils/time.js';
 import { deleteWithUndo } from '../utils/undo.js';
 
 // Define status groups and labels
-const OPEN_STATUSES = ['OPP', 'proposal_sent', 'negotiation'];
+const OPEN_STATUSES = ['open'];
 const STATUS_LABELS = {
-  'OPP': 'OPP',
-  'proposal_sent': 'Proposal',
-  'negotiation': 'Negotiation',
+  'open': 'Open',
   'frozen': 'Frozen',
-  'won_wip': 'Won(WIP)',
-  'won_done': 'Won',
+  'won': 'Won',
   'lost': 'Lost'
 };
 
 const STATUS_GROUPS = [
-  { key: 'open', title: 'Open', statuses: ['OPP', 'proposal_sent', 'negotiation'] },
-  { key: 'frozen', title: 'Frozen', statuses: ['frozen'] },
-  { key: 'won_wip', title: 'Won(WIP)', statuses: ['won_wip'] },
-  { key: 'won_done', title: 'Won', statuses: ['won_done'] },
-  { key: 'lost', title: 'Lost', statuses: ['lost'] }
+  { key: 'open', title: '😀 Open', statuses: ['open'] },
+  { key: 'frozen', title: '❄️ Frozen', statuses: ['frozen'] },
+  { key: 'won', title: 'Won', statuses: ['won'] },
+  { key: 'lost', title: '💀 Lost', statuses: ['lost'] }
 ];
 
 export async function renderDeals(container) {
@@ -73,12 +69,9 @@ export async function renderDeals(container) {
             <div class="form-group">
               <label for="d-status">Status *</label>
               <select id="d-status" class="input" required>
-                <option value="OPP">OPP</option>
-                <option value="proposal_sent">Proposal</option>
-                <option value="negotiation">Negotiation</option>
+                <option value="open">Open</option>
                 <option value="frozen">Frozen</option>
-                <option value="won_wip">Won(WIP)</option>
-                <option value="won_done">Won</option>
+                <option value="won">Won</option>
                 <option value="lost">Lost</option>
               </select>
             </div>
@@ -128,7 +121,7 @@ export async function renderDeals(container) {
       container.querySelector('#deal-edit-id').value = deal?.id || '';
       container.querySelector('#d-title').value = deal?.title || '';
       container.querySelector('#d-amount').value = deal?.amount || '';
-      container.querySelector('#d-status').value = deal?.status || 'OPP';
+      container.querySelector('#d-status').value = deal?.status || 'open';
       container.querySelector('#d-expected').value = deal?.expected_close || '';
       container.querySelector('#d-contact').value = deal?.contact_id || '';
       container.querySelector('#d-company').value = deal?.company_id || '';
@@ -219,7 +212,7 @@ export async function renderDeals(container) {
       btn.addEventListener('click', async (e) => {
         e.preventDefault();
         const dealId = btn.dataset.id;
-        const previousStatus = btn.dataset.previous || 'OPP';
+        const previousStatus = 'open';
         const { error } = await sb.from('deals')
           .update({ status: previousStatus, previous_status: null })
           .eq('id', dealId);
@@ -306,7 +299,7 @@ function renderDealRow(d, maxValue) {
       <td>(${createdDays}d / ${modifiedDays}d)</td>
       <td class="actions-cell" onclick="event.stopPropagation()">
         ${isOpenStatus ? `<a href="#" class="freeze-deal" data-id="${d.id}" data-status="${d.status}">Freeze</a>` : ''}
-        ${isFrozen ? `<a href="#" class="unfreeze-deal" data-id="${d.id}" data-previous="${d.previous_status || 'OPP'}">Unfreeze</a>` : ''}
+        ${isFrozen ? `<a href="#" class="unfreeze-deal" data-id="${d.id}">Unfreeze</a>` : ''}
         <a href="#" class="danger-link delete-deal" data-id="${d.id}" data-title="${escapeAttr(d.title)}">Delete</a>
       </td>
     </tr>
