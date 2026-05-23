@@ -3,6 +3,8 @@ import { debounce } from '../utils/debounce.js';
 import { exportCSV } from '../utils/csv.js';
 import { timeAgo } from '../utils/time.js';
 
+let lastActivityMap = new Map();
+
 const OPEN_STATUSES = ['open'];
 
 let currentSort = { col: 'last_name', asc: true };
@@ -62,11 +64,16 @@ export async function renderContacts(container) {
   container.innerHTML = '<div class="loading">Loading contacts...</div>';
 
   try {
-    const [contacts, companies, openDealLinks] = await Promise.all([
+    const [contacts, companies, openDealLinks, lastActivityResult] = await Promise.all([
       fetchContacts(),
       fetchCompanies(),
-      fetchOpenDealLinks()
+      fetchOpenDealLinks(),
+      sb.rpc('get_contacts_last_activity')
     ]);
+
+    lastActivityMap = new Map(
+      (lastActivityResult.data || []).map(r => [r.contact_id, r.last_activity_at])
+    );
 
     // Group contacts
     const linkedToOpenDeals = contacts.filter(c =>
@@ -205,17 +212,21 @@ function renderContactTable(contacts) {
             <th class="sortable" data-col="email">Email${sortIcon('email')}</th>
             <th class="sortable" data-col="phone">Phone${sortIcon('phone')}</th>
             <th>Company</th>
+            <th>Last</th>
           </tr>
         </thead>
         <tbody>
-          ${contacts.map(c => `
+          ${contacts.map(c => {
+            const lastDate = lastActivityMap.get(c.id);
+            return `
             <tr class="clickable-row" data-id="${c.id}">
               <td><strong>${esc(c.first_name)} ${esc(c.last_name)}</strong></td>
               <td>${c.email ? `<a href="mailto:${escapeAttr(c.email)}" onclick="event.stopPropagation()">${esc(c.email)}</a>` : '<span class="muted">-</span>'}</td>
               <td>${c.phone ? esc(c.phone) : '<span class="muted">-</span>'}</td>
               <td>${c.companies?.name ? esc(c.companies.name) : '<span class="muted">-</span>'}</td>
+              <td>${lastDate ? timeAgo(lastDate) : '<span class="muted">-</span>'}</td>
             </tr>
-          `).join('')}
+          `}).join('')}
         </tbody>
       </table>
     </div>

@@ -15,7 +15,8 @@
       "Bash(gh auth:*)",
       "Bash(lsof:*)",
       "Bash(npm install *)",
-      "Bash(echo \"EXIT: $?\")"
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(wc *)"
     ]
   }
 }

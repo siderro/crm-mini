@@ -171,7 +171,7 @@ textarea.input { resize: vertical; }
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  padding: 0.75rem;
+  padding: 0.5rem;
 }
 
 /* ── Page Header ── */
@@ -262,17 +262,17 @@ textarea.input { resize: vertical; }
 .detail-page { max-width: 900px; }
 
 .detail-header {
-  margin-bottom: 0.75rem;
+  border-bottom: 2px double var(--text);
+  padding-bottom: 0.4rem;
+  margin-bottom: 0.5rem;
 }
 .detail-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.35rem;
-  margin-bottom: 0.25rem;
+  gap: 0.5rem;
 }
-.detail-actions { display: flex; gap: 0.35rem; }
-.detail-title h1 { }
+.detail-toolbar h1 { flex: 1; }
+.detail-actions { display: flex; gap: 0.35rem; margin-left: auto; }
 
 .company-tag {
   display: inline-block;
@@ -318,12 +318,32 @@ textarea.input { resize: vertical; }
 }
 .contact-notes p { line-height: 1.6; }
 
+/* ── Section Bars ── */
+.section-bar {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.25rem 0.5rem;
+  margin: -0.5rem -0.5rem 0.5rem -0.5rem;
+}
+.section-bar-activity { background: var(--cyan); color: #000000; }
+.section-bar-contacts { background: var(--magenta); color: #ffffff; }
+.section-bar-deals { background: var(--yellow); color: #000000; }
+.section-bar-notes { background: var(--text-secondary); color: #ffffff; }
+
+/* ── Notes Block ── */
+.notes-block {
+  border-left: 3px solid var(--text-secondary);
+  padding: 0.4rem 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
 /* ── Activity Log ── */
 .activity-card h2 { margin-bottom: 0.5rem; }
 
 .activity-form {
-  margin-bottom: 1.25rem;
-  padding-bottom: 1.25rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
   border-bottom: 1px solid var(--border);
 }
 .activity-input-row {
@@ -496,7 +516,7 @@ textarea.input { resize: vertical; }
 /* ── Compact Patterns ── */
 .compact-meta {
   color: var(--text-secondary);
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
   line-height: 1.6;
 }
 .compact-meta a { color: var(--primary); }
@@ -614,3 +634,7 @@ textarea.input { resize: vertical; }
   .activity-input-row select { width: 100%; }
   .contacts-layout { grid-template-columns: 1fr; }
 }
+
+/* ── Dashboard ── */
+.dashboard-section { margin-bottom: 1.5rem; }
+.dashboard-section h2 { margin-bottom: 0.5rem; }

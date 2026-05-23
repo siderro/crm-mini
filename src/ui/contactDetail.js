@@ -23,24 +23,23 @@ export async function renderContactDetail(container, id) {
 
     // Build compact metadata line
     const metaParts = [];
-    if (contact.email) metaParts.push(`<a href="mailto:${escapeAttr(contact.email)}">${esc(contact.email)}</a>`);
-    if (contact.phone) metaParts.push(`<a href="tel:${escapeAttr(contact.phone)}">${esc(contact.phone)}</a>`);
-    if (contact.companies?.name) metaParts.push(`${esc(contact.companies.name)}`);
-    metaParts.push(`upd ${timeAgo(contact.updated_at)}`);
-    metaParts.push(`add ${timeAgo(contact.created_at)}`);
+    if (activityList.length > 0) metaParts.push(`Last: ${timeAgo(activityList[0].created_at)}`);
+    if (contact.email) metaParts.push(`Email: <a href="mailto:${escapeAttr(contact.email)}">${esc(contact.email)}</a>`);
+    if (contact.phone) metaParts.push(`Phone: <a href="tel:${escapeAttr(contact.phone)}">${esc(contact.phone)}</a>`);
+    if (contact.companies?.name) metaParts.push(`Company: ${esc(contact.companies.name)}`);
+    metaParts.push(`Upd: ${timeAgo(contact.updated_at)}`);
+    metaParts.push(`Add: ${timeAgo(contact.created_at)}`);
 
     container.innerHTML = `
       <div class="detail-page">
         <div class="detail-header">
           <div class="detail-toolbar">
             <a href="#/contacts" class="btn btn-back">&larr; Back</a>
+            <h1>${esc(contact.first_name)} ${esc(contact.last_name)}</h1>
             <div class="detail-actions">
               <a href="#/contacts/${id}/edit" class="btn btn-secondary">Edit</a>
               <button id="delete-contact" class="btn btn-danger">Del</button>
             </div>
-          </div>
-          <div class="detail-title">
-            <h1>${esc(contact.first_name)} ${esc(contact.last_name)}</h1>
           </div>
         </div>
 
@@ -48,10 +47,10 @@ export async function renderContactDetail(container, id) {
 
         <div class="detail-grid">
           <div class="detail-main">
-            ${contact.notes ? `<div class="card"><pre class="notes-pre">${esc(contact.notes)}</pre></div>` : ''}
+            ${contact.notes ? `<div class="notes-block"><pre class="notes-pre">${esc(contact.notes)}</pre></div>` : ''}
 
             <div class="card activity-card">
-              <h2>Activity <span class="badge">${activityList.length}</span></h2>
+              <div class="section-bar section-bar-activity">Activity (${activityList.length})</div>
               <form id="activity-form" class="activity-form">
                 <div class="activity-input-row">
                   <textarea id="activity-content" class="input" placeholder="Add note..." rows="2" required></textarea>

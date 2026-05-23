@@ -66,17 +66,18 @@ export async function renderDealDetail(container, id) {
     const metaParts = [];
     if (deal.amount) metaParts.push(`${Math.round(parseFloat(deal.amount) / 1000)}k Kč`);
     metaParts.push(`<span class="status-badge status-${deal.status}">${getStatusLabel(deal.status)}</span>`);
-    if (deal.expected_close) metaParts.push(`exp: ${new Date(deal.expected_close).toLocaleDateString('cs-CZ')}`);
-    if (contact) metaParts.push(`<a href="#/contacts/${contact.id}">${esc(contact.first_name)} ${esc(contact.last_name)}</a>`);
-    if (company) metaParts.push(`<a href="#/companies/${company.id}">${esc(company.name)}</a>`);
-    metaParts.push(`upd ${timeAgo(deal.updated_at)}`);
-    metaParts.push(`add ${timeAgo(deal.created_at)}`);
+    if (deal.expected_close) metaParts.push(`Exp: ${new Date(deal.expected_close).toLocaleDateString('cs-CZ')}`);
+    if (contact) metaParts.push(`Contact: <a href="#/contacts/${contact.id}">${esc(contact.first_name)} ${esc(contact.last_name)}</a>`);
+    if (company) metaParts.push(`Company: <a href="#/companies/${company.id}">${esc(company.name)}</a>`);
+    metaParts.push(`Upd: ${timeAgo(deal.updated_at)}`);
+    metaParts.push(`Add: ${timeAgo(deal.created_at)}`);
 
     container.innerHTML = `
       <div class="detail-page">
         <div class="detail-header">
           <div class="detail-toolbar">
             <a href="#/deals" class="btn btn-back">&larr; Back</a>
+            <h1>${esc(deal.title)}</h1>
             <div class="detail-actions">
               ${isOpenStatus ? `<button id="freeze-deal" class="btn btn-freeze">❄️</button>` : ''}
               ${isFrozen ? `<button id="unfreeze-deal" class="btn btn-success">Unfreeze</button>` : ''}
@@ -84,19 +85,22 @@ export async function renderDealDetail(container, id) {
               <button id="delete-deal" class="btn btn-danger">Del</button>
             </div>
           </div>
-          <div class="detail-title">
-            <h1>${esc(deal.title)}</h1>
-          </div>
         </div>
 
         <div class="compact-meta">${metaParts.join(' · ')}</div>
 
         <div class="detail-grid">
           <div class="detail-main">
-            ${deal.notes ? `<div class="card"><pre class="notes-pre">${esc(deal.notes)}</pre></div>` : ''}
+            ${deal.notes ? `<div class="notes-block"><pre class="notes-pre">${esc(deal.notes)}</pre></div>` : ''}
 
             <div class="card activity-card">
-              <h2>Activity <span class="badge">${activityList.length}</span></h2>
+              <div class="section-bar section-bar-activity">Activity (${activityList.length})</div>
+              <form id="activity-form" class="activity-form">
+                <div class="activity-input-row">
+                  <textarea id="activity-content" class="input" placeholder="Add note..." rows="2" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Add</button>
+              </form>
               <div class="activity-timeline">
                 ${activityList.length === 0
                   ? '<div class="empty-state">No activity.</div>'
@@ -116,6 +120,26 @@ export async function renderDealDetail(container, id) {
         </div>
       </div>
     `;
+
+    // Add activity
+    const activityForm = container.querySelector('#activity-form');
+    if (activityForm) {
+      activityForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const content = container.querySelector('#activity-content').value.trim();
+        if (!content) return;
+        const user = (await sb.auth.getUser()).data.user;
+        const { error: insErr } = await sb.from('activities').insert({
+          contact_id: deal.contact_id || null,
+          company_id: deal.company_id || null,
+          user_id: user.id,
+          deal_id: id,
+          content,
+        });
+        if (insErr) { alert('Error: ' + insErr.message); return; }
+        await renderDealDetail(container, id);
+      });
+    }
 
     // Freeze deal
     const freezeBtn = container.querySelector('#freeze-deal');
