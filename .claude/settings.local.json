@@ -14,7 +14,8 @@
       "Bash(git push:*)",
       "Bash(gh auth:*)",
       "Bash(lsof:*)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(echo \"EXIT: $?\")"
     ]
   }
 }
