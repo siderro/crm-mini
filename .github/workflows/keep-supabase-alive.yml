@@ -1,0 +1,13 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    - cron: '0 8 * * *'  # every day at 8:00 UTC
+  workflow_dispatch:       # manual trigger
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase
+        run: curl -sf https://juquttlvkairdgdkzpke.supabase.co/rest/v1/ -H "apikey:${{ secrets.SUPABASE_ANON_KEY }}" -o /dev/null
