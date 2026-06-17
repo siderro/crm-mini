@@ -7,11 +7,11 @@ const STATUS_OPTIONS = [
   { value: 'lost', label: 'Lost' }
 ];
 
-export async function renderDealForm(container, id = null) {
+export async function renderProjectForm(container, id = null) {
   container.innerHTML = '<div class="loading">Loading...</div>';
 
   const isEdit = !!id;
-  let deal = { title: '', amount: '', status: 'open', expected_close: '', contact_id: '', company_id: '', notes: '' };
+  let project = { title: '', amount: '', status: 'open', expected_close: '', contact_id: '', company_id: '', notes: '' };
 
   try {
     const [
@@ -23,29 +23,29 @@ export async function renderDealForm(container, id = null) {
     ]);
 
     if (isEdit) {
-      const { data, error } = await sb.from('deals').select('*').eq('id', id).single();
+      const { data, error } = await sb.from('projects').select('*').eq('id', id).single();
       if (error || !data) {
-        container.innerHTML = '<div class="error">Deal not found. <a href="#/deals">Back to list</a></div>';
+        container.innerHTML = '<div class="error">Project not found. <a href="#/projects">Back to list</a></div>';
         return;
       }
-      deal = data;
+      project = data;
     }
 
     container.innerHTML = `
       <div class="form-page">
-        <a href="${isEdit ? `#/deals/${id}` : '#/deals'}" class="btn btn-back">&larr; ${isEdit ? 'Back to deal' : 'Back to list'}</a>
-        <h1>${isEdit ? 'Edit Deal' : 'New Deal'}</h1>
+        <a href="${isEdit ? `#/projects/${id}` : '#/projects'}" class="btn btn-back">&larr; ${isEdit ? 'Back to project' : 'Back to list'}</a>
+        <h1>${isEdit ? 'Edit Project' : 'New Project'}</h1>
 
-        <form id="deal-form" class="card form-card" novalidate>
+        <form id="project-form" class="card form-card" novalidate>
           <div class="form-row">
             <div class="form-group">
-              <label for="title">Deal Title *</label>
-              <input type="text" id="title" class="input" value="${escapeAttr(deal.title)}" required>
+              <label for="title">Project Title *</label>
+              <input type="text" id="title" class="input" value="${escapeAttr(project.title)}" required>
               <span class="field-error" id="err-title"></span>
             </div>
             <div class="form-group">
               <label for="amount">Amount</label>
-              <input type="number" id="amount" class="input" value="${deal.amount || ''}" step="0.01" placeholder="0.00">
+              <input type="number" id="amount" class="input" value="${project.amount || ''}" step="0.01" placeholder="0.00">
             </div>
           </div>
           <div class="form-row">
@@ -53,13 +53,13 @@ export async function renderDealForm(container, id = null) {
               <label for="status">Status *</label>
               <select id="status" class="input" required>
                 ${STATUS_OPTIONS.map(opt =>
-                  `<option value="${opt.value}"${deal.status === opt.value ? ' selected' : ''}>${opt.label}</option>`
+                  `<option value="${opt.value}"${project.status === opt.value ? ' selected' : ''}>${opt.label}</option>`
                 ).join('')}
               </select>
             </div>
             <div class="form-group">
               <label for="expected_close">Expected Close</label>
-              <input type="date" id="expected_close" class="input" value="${deal.expected_close || ''}">
+              <input type="date" id="expected_close" class="input" value="${project.expected_close || ''}">
             </div>
           </div>
           <div class="form-row">
@@ -68,7 +68,7 @@ export async function renderDealForm(container, id = null) {
               <select id="contact_id" class="input">
                 <option value="">-- None --</option>
                 ${(contacts || []).map(c =>
-                  `<option value="${c.id}"${deal.contact_id === c.id ? ' selected' : ''}>${esc(c.first_name)} ${esc(c.last_name)}</option>`
+                  `<option value="${c.id}"${project.contact_id === c.id ? ' selected' : ''}>${esc(c.first_name)} ${esc(c.last_name)}</option>`
                 ).join('')}
               </select>
             </div>
@@ -77,25 +77,25 @@ export async function renderDealForm(container, id = null) {
               <select id="company_id" class="input">
                 <option value="">-- None --</option>
                 ${(companies || []).map(c =>
-                  `<option value="${c.id}"${deal.company_id === c.id ? ' selected' : ''}>${esc(c.name)}</option>`
+                  `<option value="${c.id}"${project.company_id === c.id ? ' selected' : ''}>${esc(c.name)}</option>`
                 ).join('')}
               </select>
             </div>
           </div>
           <div class="form-group">
             <label for="notes">Notes</label>
-            <textarea id="notes" class="input" rows="4">${esc(deal.notes || '')}</textarea>
+            <textarea id="notes" class="input" rows="4">${esc(project.notes || '')}</textarea>
           </div>
           <div class="form-actions">
-            <button type="submit" class="btn btn-primary" id="submit-btn">${isEdit ? 'Save Changes' : 'Create Deal'}</button>
-            <a href="${isEdit ? `#/deals/${id}` : '#/deals'}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary" id="submit-btn">${isEdit ? 'Save Changes' : 'Create Project'}</button>
+            <a href="${isEdit ? `#/projects/${id}` : '#/projects'}" class="btn btn-secondary">Cancel</a>
           </div>
           <div class="form-error" id="form-error"></div>
         </form>
       </div>
     `;
 
-    container.querySelector('#deal-form').addEventListener('submit', async (e) => {
+    container.querySelector('#project-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       clearErrors(container);
 
@@ -110,7 +110,7 @@ export async function renderDealForm(container, id = null) {
       // Validate
       let valid = true;
       if (!title) {
-        showFieldError(container, 'title', 'Deal title is required');
+        showFieldError(container, 'title', 'Project title is required');
         valid = false;
       }
       if (!valid) return;
@@ -131,20 +131,20 @@ export async function renderDealForm(container, id = null) {
         };
 
         if (isEdit) {
-          const { error } = await sb.from('deals').update(payload).eq('id', id);
+          const { error } = await sb.from('projects').update(payload).eq('id', id);
           if (error) throw error;
-          window.location.hash = `#/deals/${id}`;
+          window.location.hash = `#/projects/${id}`;
         } else {
           const user = (await sb.auth.getUser()).data.user;
           payload.user_id = user.id;
-          const { data, error } = await sb.from('deals').insert(payload).select().single();
+          const { data, error } = await sb.from('projects').insert(payload).select().single();
           if (error) throw error;
-          window.location.hash = `#/deals/${data.id}`;
+          window.location.hash = `#/projects/${data.id}`;
         }
       } catch (err) {
         container.querySelector('#form-error').textContent = 'Error: ' + err.message;
         btn.disabled = false;
-        btn.textContent = isEdit ? 'Save Changes' : 'Create Deal';
+        btn.textContent = isEdit ? 'Save Changes' : 'Create Project';
       }
     });
 

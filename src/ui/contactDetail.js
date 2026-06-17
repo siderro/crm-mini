@@ -2,28 +2,19 @@ import { sb } from '../supabase.js';
 import { timeAgo } from '../utils/time.js';
 import { deleteWithUndo } from '../utils/undo.js';
 
-const OPEN_STATUSES = ['open'];
-
 export async function renderContactDetail(container, id) {
   container.innerHTML = '<div class="loading">Loading...</div>';
 
   try {
-    const [{ data: contact, error }, { data: activities }, { data: deals }] = await Promise.all([
-      sb.from('contacts').select('*, companies(id, name)').eq('id', id).single(),
-      sb.from('activities').select('*, deals(title)').eq('contact_id', id).order('created_at', { ascending: false }),
-      sb.from('deals').select('id, title').in('status', OPEN_STATUSES).order('title'),
-    ]);
+    const { data: contact, error } = await sb.from('contacts').select('*, companies(id, name)').eq('id', id).single();
 
     if (error || !contact) {
       container.innerHTML = '<div class="error">Contact not found. <a href="#/contacts">Back to list</a></div>';
       return;
     }
 
-    const activityList = activities || [];
-
     // Build compact metadata line
     const metaParts = [];
-    if (activityList.length > 0) metaParts.push(`Last: ${timeAgo(activityList[0].created_at)}`);
     if (contact.email) metaParts.push(`Email: <a href="mailto:${escapeAttr(contact.email)}">${esc(contact.email)}</a>`);
     if (contact.phone) metaParts.push(`Phone: <a href="tel:${escapeAttr(contact.phone)}">${esc(contact.phone)}</a>`);
     if (contact.companies?.name) metaParts.push(`Company: ${esc(contact.companies.name)}`);
@@ -47,41 +38,46 @@ export async function renderContactDetail(container, id) {
 
         <div class="detail-grid">
           <div class="detail-main">
-            ${contact.notes ? `<div class="notes-block"><pre class="notes-pre">${esc(contact.notes)}</pre></div>` : ''}
-
-            <div class="card activity-card">
-              <div class="section-bar section-bar-activity">Activity (${activityList.length})</div>
-              <form id="activity-form" class="activity-form">
-                <div class="activity-input-row">
-                  <textarea id="activity-content" class="input" placeholder="Add note..." rows="2" required></textarea>
-                  <select id="activity-deal" class="input">
-                    <option value="">No project</option>
-                    ${(deals || []).map(d => `<option value="${d.id}">${esc(d.title)}</option>`).join('')}
-                  </select>
-                </div>
-                <button type="submit" class="btn btn-primary">Add</button>
-              </form>
-
-              <div class="activity-timeline">
-                ${activityList.length === 0
-                  ? '<div class="empty-state">No activity.</div>'
-                  : activityList.map(a => `
-                    <div class="activity-item" data-id="${a.id}">
-                      <div class="activity-meta">
-                        ${a.deals?.title ? `<span class="activity-project-badge">${esc(a.deals.title)}</span>` : ''}
-                        <span class="activity-time">${timeAgo(a.created_at)}</span>
-                        <a href="#" class="edit-activity" data-id="${a.id}">Edit</a>
-                        <a href="#" class="danger-link delete-activity" data-id="${a.id}">Delete</a>
-                      </div>
-                      <p>${esc(a.content).replace(/\n/g, '<br>')}</p>
-                    </div>
-                  `).join('')}
+            <div class="card">
+              <div class="section-bar">Notes</div>
+              <div class="notes-toolbar">
+                <button id="add-timestamp-btn" class="btn btn-sm btn-secondary">Add timestamp</button>
+                <span id="notes-status"></span>
+                <button id="save-notes-btn" class="btn btn-sm btn-primary">Save</button>
               </div>
+              <textarea id="contact-notes" class="input notes-textarea" rows="10">${esc(contact.notes || '')}</textarea>
             </div>
           </div>
         </div>
       </div>
     `;
+
+    // Save notes
+    container.querySelector('#save-notes-btn').addEventListener('click', async () => {
+      const notes = container.querySelector('#contact-notes').value;
+      const status = container.querySelector('#notes-status');
+      const { error: updErr } = await sb.from('contacts').update({ notes: notes || null }).eq('id', id);
+      if (updErr) {
+        status.textContent = 'Error: ' + updErr.message;
+        status.style.color = 'var(--danger, red)';
+      } else {
+        status.textContent = 'Saved';
+        status.style.color = 'var(--success, green)';
+        setTimeout(() => { status.textContent = ''; }, 2000);
+      }
+    });
+
+    // Add timestamp
+    container.querySelector('#add-timestamp-btn').addEventListener('click', () => {
+      const textarea = container.querySelector('#contact-notes');
+      const date = new Date().toLocaleDateString('cs-CZ');
+      const pos = textarea.selectionStart;
+      const val = textarea.value;
+      const stamp = `\n[${date}] `;
+      textarea.value = val.slice(0, pos) + stamp + val.slice(pos);
+      textarea.focus();
+      textarea.selectionStart = textarea.selectionEnd = pos + stamp.length;
+    });
 
     // Delete contact
     container.querySelector('#delete-contact').addEventListener('click', async () => {
@@ -89,76 +85,6 @@ export async function renderContactDetail(container, id) {
         () => { window.location.hash = '#/contacts'; },
         () => { window.location.hash = `#/contacts/${id}`; }
       );
-    });
-
-    // Add activity
-    container.querySelector('#activity-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const content = container.querySelector('#activity-content').value.trim();
-      if (!content) return;
-      const dealId = container.querySelector('#activity-deal').value || null;
-      const user = (await sb.auth.getUser()).data.user;
-      const { error: insErr } = await sb.from('activities').insert({
-        contact_id: id,
-        user_id: user.id,
-        deal_id: dealId,
-        content,
-      });
-      if (insErr) { alert('Error: ' + insErr.message); return; }
-      await renderContactDetail(container, id);
-    });
-
-    // Edit activity (inline)
-    container.querySelectorAll('.edit-activity').forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        const actId = link.dataset.id;
-        const act = activityList.find(a => a.id === actId);
-        if (!act) return;
-        const item = container.querySelector(`.activity-item[data-id="${actId}"]`);
-        item.innerHTML = `
-          <form class="edit-activity-form">
-            <div class="activity-input-row">
-              <textarea class="input edit-content" rows="2">${esc(act.content)}</textarea>
-              <select class="input edit-deal">
-                <option value="">No project</option>
-                ${(deals || []).map(d => `<option value="${d.id}"${d.id === act.deal_id ? ' selected' : ''}>${esc(d.title)}</option>`).join('')}
-              </select>
-            </div>
-            <div class="form-actions">
-              <button type="submit" class="btn btn-primary">Save</button>
-              <a href="#" class="cancel-edit">Cancel</a>
-            </div>
-          </form>
-        `;
-        item.querySelector('.cancel-edit').addEventListener('click', (ev) => {
-          ev.preventDefault();
-          renderContactDetail(container, id);
-        });
-        item.querySelector('.edit-activity-form').addEventListener('submit', async (ev) => {
-          ev.preventDefault();
-          const content = item.querySelector('.edit-content').value.trim();
-          if (!content) return;
-          const dealId = item.querySelector('.edit-deal').value || null;
-          const { error: updErr } = await sb.from('activities').update({ content, deal_id: dealId }).eq('id', actId);
-          if (updErr) { alert('Error: ' + updErr.message); return; }
-          await renderContactDetail(container, id);
-        });
-      });
-    });
-
-    // Delete activity
-    container.querySelectorAll('.delete-activity').forEach(link => {
-      link.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const act = activityList.find(a => a.id === link.dataset.id);
-        if (!act) return;
-        await deleteWithUndo('activities', act, 'activity',
-          () => renderContactDetail(container, id),
-          () => renderContactDetail(container, id)
-        );
-      });
     });
 
   } catch (err) {

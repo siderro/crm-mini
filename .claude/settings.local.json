@@ -16,7 +16,16 @@
       "Bash(lsof:*)",
       "Bash(npm install *)",
       "Bash(echo \"EXIT: $?\")",
-      "Bash(wc *)"
+      "Bash(wc *)",
+      "Bash(ls /Users/jakubgoldmann/Desktop/*.command /Users/jakubgoldmann/Desktop/*.sh /Users/jakubgoldmann/Desktop/*.app)",
+      "Bash(ls /Users/jakubgoldmann/*.command /Users/jakubgoldmann/*.sh)",
+      "Bash(chmod +x *)",
+      "Bash(magick *)",
+      "Bash(brew list *)",
+      "Bash(brew install *)",
+      "Bash(fileicon set *)",
+      "Bash(ls /Users/jakubgoldmann/Library/CloudStorage/Dropbox/Skripty/crm-mini/src/ui/deals*.js)",
+      "Bash(ls /Users/jakubgoldmann/Library/CloudStorage/Dropbox/Skripty/crm-mini/src/ui/project*.js)"
     ]
   }
 }

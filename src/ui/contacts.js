@@ -3,8 +3,6 @@ import { debounce } from '../utils/debounce.js';
 import { exportCSV } from '../utils/csv.js';
 import { timeAgo } from '../utils/time.js';
 
-let lastActivityMap = new Map();
-
 const OPEN_STATUSES = ['open'];
 
 let currentSort = { col: 'last_name', asc: true };
@@ -37,14 +35,14 @@ async function fetchCompanies() {
 }
 
 async function fetchOpenDealLinks() {
-  // Get contacts with direct open deals
-  const { data: contactDeals } = await sb.from('deals')
+  // Get contacts with direct open projects
+  const { data: contactDeals } = await sb.from('projects')
     .select('contact_id')
     .in('status', OPEN_STATUSES)
     .not('contact_id', 'is', null);
 
-  // Get companies with open deals
-  const { data: companyDeals } = await sb.from('deals')
+  // Get companies with open projects
+  const { data: companyDeals } = await sb.from('projects')
     .select('company_id')
     .in('status', OPEN_STATUSES)
     .not('company_id', 'is', null);
@@ -64,16 +62,11 @@ export async function renderContacts(container) {
   container.innerHTML = '<div class="loading">Loading contacts...</div>';
 
   try {
-    const [contacts, companies, openDealLinks, lastActivityResult] = await Promise.all([
+    const [contacts, companies, openDealLinks] = await Promise.all([
       fetchContacts(),
       fetchCompanies(),
       fetchOpenDealLinks(),
-      sb.rpc('get_contacts_last_activity')
     ]);
-
-    lastActivityMap = new Map(
-      (lastActivityResult.data || []).map(r => [r.contact_id, r.last_activity_at])
-    );
 
     // Group contacts
     const linkedToOpenDeals = contacts.filter(c =>
@@ -99,7 +92,7 @@ export async function renderContacts(container) {
         <h1>Contacts <span class="badge">${contacts.length}</span></h1>
         <div class="header-actions">
           <button id="csv-export" class="btn btn-secondary">Export CSV</button>
-          <a href="https://www.icloud.com/contacts/" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">🍎 Contacts</a>
+          <a href="https://www.icloud.com/contacts/" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Contacts</a>
           <a href="#/contacts/new" class="btn btn-primary">+ New Contact</a>
         </div>
       </div>
@@ -175,11 +168,11 @@ export async function renderContacts(container) {
 function renderGroupedContacts(linkedToOpenDeals, others) {
   let html = '';
 
-  // Group 1: Contacts linked to open deals
+  // Group 1: Contacts linked to open projects
   if (linkedToOpenDeals.length > 0) {
     html += `
       <div class="deal-group">
-        <h2 class="group-heading">Open Deals <span class="badge">${linkedToOpenDeals.length}</span></h2>
+        <h2 class="group-heading">Open Projects <span class="badge">${linkedToOpenDeals.length}</span></h2>
         ${renderContactTable(linkedToOpenDeals)}
       </div>
     `;
@@ -212,19 +205,18 @@ function renderContactTable(contacts) {
             <th class="sortable" data-col="email">Email${sortIcon('email')}</th>
             <th class="sortable" data-col="phone">Phone${sortIcon('phone')}</th>
             <th>Company</th>
-            <th>Last</th>
+            <th>Updated</th>
           </tr>
         </thead>
         <tbody>
           ${contacts.map(c => {
-            const lastDate = lastActivityMap.get(c.id);
             return `
             <tr class="clickable-row" data-id="${c.id}">
               <td><strong>${esc(c.first_name)} ${esc(c.last_name)}</strong></td>
               <td>${c.email ? `<a href="mailto:${escapeAttr(c.email)}" onclick="event.stopPropagation()">${esc(c.email)}</a>` : '<span class="muted">-</span>'}</td>
               <td>${c.phone ? esc(c.phone) : '<span class="muted">-</span>'}</td>
               <td>${c.companies?.name ? esc(c.companies.name) : '<span class="muted">-</span>'}</td>
-              <td>${lastDate ? timeAgo(lastDate) : '<span class="muted">-</span>'}</td>
+              <td>${c.updated_at ? timeAgo(c.updated_at) : '<span class="muted">-</span>'}</td>
             </tr>
           `}).join('')}
         </tbody>

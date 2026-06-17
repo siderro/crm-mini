@@ -12,17 +12,17 @@ const STATUS_LABELS = {
 };
 
 const STATUS_GROUPS = [
-  { key: 'open', title: '😀 Open', statuses: ['open'] },
-  { key: 'frozen', title: '❄️ Frozen', statuses: ['frozen'] },
+  { key: 'open', title: 'Open', statuses: ['open'] },
+  { key: 'frozen', title: 'Frozen', statuses: ['frozen'] },
   { key: 'won', title: 'Won', statuses: ['won'] },
-  { key: 'lost', title: '💀 Lost', statuses: ['lost'] }
+  { key: 'lost', title: 'Lost', statuses: ['lost'] }
 ];
 
-export async function renderDeals(container) {
-  container.innerHTML = '<div class="loading">Loading deals...</div>';
+export async function renderProjects(container) {
+  container.innerHTML = '<div class="loading">Loading projects...</div>';
 
   try {
-    const { data: deals, error } = await sb.from('deals')
+    const { data: projects, error } = await sb.from('projects')
       .select('*, contacts(first_name, last_name), companies(name)')
       .order('updated_at', { ascending: false });
 
@@ -31,33 +31,33 @@ export async function renderDeals(container) {
     const { data: contacts } = await sb.from('contacts').select('id, first_name, last_name').order('last_name');
     const { data: companies } = await sb.from('companies').select('id, name').order('name');
 
-    const list = deals || [];
+    const list = projects || [];
     const contactsList = contacts || [];
     const companiesList = companies || [];
 
     // Calculate stats
     const totalValue = list.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
-    const frozenDeals = list.filter(d => d.status === 'frozen');
-    const frozenValue = frozenDeals.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+    const frozenProjects = list.filter(d => d.status === 'frozen');
+    const frozenValue = frozenProjects.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
 
-    // Group deals by status
-    const groupedDeals = groupDealsByStatus(list);
+    // Group projects by status
+    const groupedProjects = groupProjectsByStatus(list);
 
     container.innerHTML = `
       <div class="page-header">
-        <h1>Deals <span class="badge">${list.length}</span> <span class="header-meta">Total ${totalValue.toLocaleString('cs-CZ')} Kč / Frozen ${frozenValue.toLocaleString('cs-CZ')} Kč</span></h1>
+        <h1>Projects <span class="badge">${list.length}</span> <span class="header-meta">Total ${totalValue.toLocaleString('cs-CZ')} Kc / Frozen ${frozenValue.toLocaleString('cs-CZ')} Kc</span></h1>
         <div class="header-actions">
-          <button id="add-deal-btn" class="btn btn-primary">+ New Deal</button>
+          <button id="add-project-btn" class="btn btn-primary">+ New Project</button>
         </div>
       </div>
 
-      <div id="deal-form-wrap" class="card form-card" style="display:none">
-        <h2 id="deal-form-title">New Deal</h2>
-        <form id="deal-form">
-          <input type="hidden" id="deal-edit-id" value="">
+      <div id="project-form-wrap" class="card form-card" style="display:none">
+        <h2 id="project-form-title">New Project</h2>
+        <form id="project-form">
+          <input type="hidden" id="project-edit-id" value="">
           <div class="form-row">
             <div class="form-group">
-              <label for="d-title">Deal Title *</label>
+              <label for="d-title">Project Title *</label>
               <input type="text" id="d-title" class="input" required>
             </div>
             <div class="form-group">
@@ -101,50 +101,50 @@ export async function renderDeals(container) {
             <textarea id="d-notes" class="input" rows="3"></textarea>
           </div>
           <div class="form-actions">
-            <button type="submit" class="btn btn-primary" id="deal-submit-btn">Create Deal</button>
-            <button type="button" id="deal-cancel-btn" class="btn btn-secondary">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="project-submit-btn">Create Project</button>
+            <button type="button" id="project-cancel-btn" class="btn btn-secondary">Cancel</button>
           </div>
-          <div class="form-error" id="deal-form-error"></div>
+          <div class="form-error" id="project-form-error"></div>
         </form>
       </div>
 
-      ${renderGroupedDeals(groupedDeals, list)}
+      ${renderGroupedProjects(groupedProjects, list)}
     `;
 
-    const formWrap = container.querySelector('#deal-form-wrap');
-    const form = container.querySelector('#deal-form');
+    const formWrap = container.querySelector('#project-form-wrap');
+    const form = container.querySelector('#project-form');
 
-    function showForm(deal = null) {
+    function showForm(project = null) {
       formWrap.style.display = '';
-      container.querySelector('#deal-form-title').textContent = deal ? 'Edit Deal' : 'New Deal';
-      container.querySelector('#deal-submit-btn').textContent = deal ? 'Save Changes' : 'Create Deal';
-      container.querySelector('#deal-edit-id').value = deal?.id || '';
-      container.querySelector('#d-title').value = deal?.title || '';
-      container.querySelector('#d-amount').value = deal?.amount || '';
-      container.querySelector('#d-status').value = deal?.status || 'open';
-      container.querySelector('#d-expected').value = deal?.expected_close || '';
-      container.querySelector('#d-contact').value = deal?.contact_id || '';
-      container.querySelector('#d-company').value = deal?.company_id || '';
-      container.querySelector('#d-notes').value = deal?.notes || '';
+      container.querySelector('#project-form-title').textContent = project ? 'Edit Project' : 'New Project';
+      container.querySelector('#project-submit-btn').textContent = project ? 'Save Changes' : 'Create Project';
+      container.querySelector('#project-edit-id').value = project?.id || '';
+      container.querySelector('#d-title').value = project?.title || '';
+      container.querySelector('#d-amount').value = project?.amount || '';
+      container.querySelector('#d-status').value = project?.status || 'open';
+      container.querySelector('#d-expected').value = project?.expected_close || '';
+      container.querySelector('#d-contact').value = project?.contact_id || '';
+      container.querySelector('#d-company').value = project?.company_id || '';
+      container.querySelector('#d-notes').value = project?.notes || '';
       container.querySelector('#d-title').focus();
     }
 
     function hideForm() {
       formWrap.style.display = 'none';
       form.reset();
-      container.querySelector('#deal-edit-id').value = '';
-      container.querySelector('#deal-form-error').textContent = '';
+      container.querySelector('#project-edit-id').value = '';
+      container.querySelector('#project-form-error').textContent = '';
     }
 
-    container.querySelector('#add-deal-btn').addEventListener('click', () => showForm());
-    container.querySelector('#deal-cancel-btn').addEventListener('click', hideForm);
+    container.querySelector('#add-project-btn').addEventListener('click', () => showForm());
+    container.querySelector('#project-cancel-btn').addEventListener('click', hideForm);
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const title = container.querySelector('#d-title').value.trim();
-      if (!title) { container.querySelector('#deal-form-error').textContent = 'Deal title is required'; return; }
+      if (!title) { container.querySelector('#project-form-error').textContent = 'Project title is required'; return; }
 
-      const editId = container.querySelector('#deal-edit-id').value;
+      const editId = container.querySelector('#project-edit-id').value;
       const payload = {
         title,
         amount: container.querySelector('#d-amount').value || null,
@@ -157,22 +157,22 @@ export async function renderDeals(container) {
 
       try {
         if (editId) {
-          const { error } = await sb.from('deals').update(payload).eq('id', editId);
+          const { error } = await sb.from('projects').update(payload).eq('id', editId);
           if (error) throw error;
         } else {
           const user = (await sb.auth.getUser()).data.user;
           payload.user_id = user.id;
-          const { error } = await sb.from('deals').insert(payload);
+          const { error } = await sb.from('projects').insert(payload);
           if (error) throw error;
         }
-        await renderDeals(container);
+        await renderProjects(container);
       } catch (err) {
-        container.querySelector('#deal-form-error').textContent = 'Error: ' + err.message;
+        container.querySelector('#project-form-error').textContent = 'Error: ' + err.message;
       }
     });
 
     // Edit links
-    container.querySelectorAll('.edit-deal').forEach(btn => {
+    container.querySelectorAll('.edit-project').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         const d = list.find(x => x.id === btn.dataset.id);
@@ -181,50 +181,50 @@ export async function renderDeals(container) {
     });
 
     // Delete links
-    container.querySelectorAll('.delete-deal').forEach(btn => {
+    container.querySelectorAll('.delete-project').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.preventDefault();
         const d = list.find(x => x.id === btn.dataset.id);
         if (!d) return;
-        await deleteWithUndo('deals', d, `"${d.title}"`,
-          () => renderDeals(container),
-          () => renderDeals(container)
+        await deleteWithUndo('projects', d, `"${d.title}"`,
+          () => renderProjects(container),
+          () => renderProjects(container)
         );
       });
     });
 
     // Freeze links
-    container.querySelectorAll('.freeze-deal').forEach(btn => {
+    container.querySelectorAll('.freeze-project').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.preventDefault();
-        const dealId = btn.dataset.id;
+        const projectId = btn.dataset.id;
         const currentStatus = btn.dataset.status;
-        const { error } = await sb.from('deals')
+        const { error } = await sb.from('projects')
           .update({ status: 'frozen', previous_status: currentStatus })
-          .eq('id', dealId);
+          .eq('id', projectId);
         if (error) { alert('Error: ' + error.message); return; }
-        await renderDeals(container);
+        await renderProjects(container);
       });
     });
 
     // Unfreeze links
-    container.querySelectorAll('.unfreeze-deal').forEach(btn => {
+    container.querySelectorAll('.unfreeze-project').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.preventDefault();
-        const dealId = btn.dataset.id;
+        const projectId = btn.dataset.id;
         const previousStatus = 'open';
-        const { error } = await sb.from('deals')
+        const { error } = await sb.from('projects')
           .update({ status: previousStatus, previous_status: null })
-          .eq('id', dealId);
+          .eq('id', projectId);
         if (error) { alert('Error: ' + error.message); return; }
-        await renderDeals(container);
+        await renderProjects(container);
       });
     });
 
-    // Click on deal rows
+    // Click on project rows
     container.querySelectorAll('.clickable-row').forEach(row => {
       row.addEventListener('click', () => {
-        window.location.hash = `#/deals/${row.dataset.id}`;
+        window.location.hash = `#/projects/${row.dataset.id}`;
       });
     });
 
@@ -233,35 +233,35 @@ export async function renderDeals(container) {
   }
 }
 
-function groupDealsByStatus(deals) {
+function groupProjectsByStatus(projects) {
   const grouped = {};
   STATUS_GROUPS.forEach(group => {
-    const groupDeals = deals.filter(d => group.statuses.includes(d.status));
+    const groupProjects = projects.filter(d => group.statuses.includes(d.status));
     // Sort by updated_at desc, created_at desc, title asc
-    groupDeals.sort((a, b) => {
+    groupProjects.sort((a, b) => {
       if (a.updated_at !== b.updated_at) return new Date(b.updated_at) - new Date(a.updated_at);
       if (a.created_at !== b.created_at) return new Date(b.created_at) - new Date(a.created_at);
       return (a.title || '').localeCompare(b.title || '');
     });
-    grouped[group.key] = { ...group, deals: groupDeals };
+    grouped[group.key] = { ...group, projects: groupProjects };
   });
   return grouped;
 }
 
-function renderGroupedDeals(groupedDeals, allDeals) {
-  const maxValue = Math.max(...allDeals.map(d => parseFloat(d.amount) || 0), 1);
+function renderGroupedProjects(groupedProjects, allProjects) {
+  const maxValue = Math.max(...allProjects.map(d => parseFloat(d.amount) || 0), 1);
 
-  return Object.values(groupedDeals).map(group => {
-    if (group.deals.length === 0) return '';
+  return Object.values(groupedProjects).map(group => {
+    if (group.projects.length === 0) return '';
 
     return `
-      <div class="deal-group">
-        <h2 class="group-heading">${group.title} <span class="badge">${group.deals.length}</span></h2>
+      <div class="project-group">
+        <h2 class="group-heading">${group.title} <span class="badge">${group.projects.length}</span></h2>
         <div class="table-wrap">
-          <table class="data-table table-deals">
+          <table class="data-table table-projects">
             <thead>
               <tr>
-                <th>Deal</th>
+                <th>Project</th>
                 <th>Status</th>
                 <th>Value</th>
                 <th>Created/Updated</th>
@@ -269,7 +269,7 @@ function renderGroupedDeals(groupedDeals, allDeals) {
               </tr>
             </thead>
             <tbody>
-              ${group.deals.map(d => renderDealRow(d, maxValue)).join('')}
+              ${group.projects.map(d => renderProjectRow(d, maxValue)).join('')}
             </tbody>
           </table>
         </div>
@@ -278,7 +278,7 @@ function renderGroupedDeals(groupedDeals, allDeals) {
   }).join('');
 }
 
-function renderDealRow(d, maxValue) {
+function renderProjectRow(d, maxValue) {
   const createdDays = getDaysAgo(d.created_at);
   const modifiedDays = getDaysAgo(d.updated_at);
   const amountNum = parseFloat(d.amount) || 0;
@@ -295,12 +295,12 @@ function renderDealRow(d, maxValue) {
     <tr class="clickable-row" data-id="${d.id}">
       <td><strong>${esc(d.title)}</strong></td>
       <td>${statusLabel}</td>
-      <td><span class="text-progress-bar">${progressBar}</span> ${amount} Kč</td>
+      <td><span class="text-progress-bar">${progressBar}</span> ${amount} Kc</td>
       <td>(${createdDays}d / ${modifiedDays}d)</td>
       <td class="actions-cell" onclick="event.stopPropagation()">
-        ${isOpenStatus ? `<a href="#" class="freeze-deal" data-id="${d.id}" data-status="${d.status}">Freeze</a>` : ''}
-        ${isFrozen ? `<a href="#" class="unfreeze-deal" data-id="${d.id}">Unfreeze</a>` : ''}
-        <a href="#" class="danger-link delete-deal" data-id="${d.id}" data-title="${escapeAttr(d.title)}">Delete</a>
+        ${isOpenStatus ? `<a href="#" class="freeze-project" data-id="${d.id}" data-status="${d.status}">Freeze</a>` : ''}
+        ${isFrozen ? `<a href="#" class="unfreeze-project" data-id="${d.id}">Unfreeze</a>` : ''}
+        <a href="#" class="danger-link delete-project" data-id="${d.id}" data-title="${escapeAttr(d.title)}">Delete</a>
       </td>
     </tr>
   `;
@@ -333,8 +333,8 @@ function renderTextProgressBar(percentage) {
   const filledBlocks = Math.round((pct / 100) * totalBlocks);
   const emptyBlocks = totalBlocks - filledBlocks;
 
-  const filled = '█'.repeat(filledBlocks);
-  const empty = '░'.repeat(emptyBlocks);
+  const filled = '\u2588'.repeat(filledBlocks);
+  const empty = '\u2591'.repeat(emptyBlocks);
 
   return `${filled}${empty}`;
 }

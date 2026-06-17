@@ -7,32 +7,32 @@ export async function renderCompanies(container) {
   container.innerHTML = '<div class="loading">Loading companies...</div>';
 
   try {
-    // Fetch companies with contact count and open deals count
+    // Fetch companies with contact count and open projects count
     const { data: companies, error } = await sb.from('companies')
       .select('*, contacts(id)')
       .order('name');
 
     if (error) throw error;
 
-    // Fetch open deals per company
-    const { data: openDeals } = await sb.from('deals')
+    // Fetch open projects per company
+    const { data: openProjects } = await sb.from('projects')
       .select('company_id')
       .in('status', OPEN_STATUSES);
 
-    const openDealsByCompany = {};
-    (openDeals || []).forEach(deal => {
-      if (deal.company_id) {
-        openDealsByCompany[deal.company_id] = (openDealsByCompany[deal.company_id] || 0) + 1;
+    const openProjectsByCompany = {};
+    (openProjects || []).forEach(p => {
+      if (p.company_id) {
+        openProjectsByCompany[p.company_id] = (openProjectsByCompany[p.company_id] || 0) + 1;
       }
     });
 
     const list = companies || [];
 
     // Group companies
-    const withOpenDeals = list.filter(c => openDealsByCompany[c.id] > 0)
+    const withOpenProjects = list.filter(c => openProjectsByCompany[c.id] > 0)
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
-    const others = list.filter(c => !openDealsByCompany[c.id])
+    const others = list.filter(c => !openProjectsByCompany[c.id])
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
     container.innerHTML = `
@@ -84,7 +84,7 @@ export async function renderCompanies(container) {
         </form>
       </div>
 
-      ${renderGroupedCompanies(withOpenDeals, others, openDealsByCompany)}
+      ${renderGroupedCompanies(withOpenProjects, others, openProjectsByCompany)}
     `;
 
     const formWrap = container.querySelector('#company-form-wrap');
@@ -179,14 +179,14 @@ export async function renderCompanies(container) {
   }
 }
 
-function renderGroupedCompanies(withOpenDeals, others, openDealsByCompany) {
+function renderGroupedCompanies(withOpenProjects, others, openProjectsByCompany) {
   let html = '';
 
-  // Group 1: Companies with open deals
-  if (withOpenDeals.length > 0) {
+  // Group 1: Companies with open projects
+  if (withOpenProjects.length > 0) {
     html += `
       <div class="deal-group">
-        <h2 class="group-heading">Open Deals <span class="badge">${withOpenDeals.length}</span></h2>
+        <h2 class="group-heading">Open Projects <span class="badge">${withOpenProjects.length}</span></h2>
         <div class="table-wrap">
           <table class="data-table table-companies">
             <thead>
@@ -195,14 +195,14 @@ function renderGroupedCompanies(withOpenDeals, others, openDealsByCompany) {
                 <th>Official</th>
                 <th>Email</th>
                 <th>Web</th>
-                <th>IČO</th>
+                <th>ICO</th>
                 <th>Contacts</th>
-                <th>Open Deals</th>
+                <th>Open Projects</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              ${withOpenDeals.map(c => renderCompanyRow(c, openDealsByCompany[c.id] || 0)).join('')}
+              ${withOpenProjects.map(c => renderCompanyRow(c, openProjectsByCompany[c.id] || 0)).join('')}
             </tbody>
           </table>
         </div>
@@ -223,7 +223,7 @@ function renderGroupedCompanies(withOpenDeals, others, openDealsByCompany) {
                 <th>Official</th>
                 <th>Email</th>
                 <th>Web</th>
-                <th>IČO</th>
+                <th>ICO</th>
                 <th>Contacts</th>
                 <th>Actions</th>
               </tr>
@@ -237,14 +237,14 @@ function renderGroupedCompanies(withOpenDeals, others, openDealsByCompany) {
     `;
   }
 
-  if (withOpenDeals.length === 0 && others.length === 0) {
+  if (withOpenProjects.length === 0 && others.length === 0) {
     html = '<div class="empty-state">No companies.</div>';
   }
 
   return html;
 }
 
-function renderCompanyRow(c, openDealsCount) {
+function renderCompanyRow(c, openProjectsCount) {
   return `
     <tr class="clickable-row" data-id="${c.id}">
       <td><strong>${esc(c.name)}</strong></td>
@@ -253,7 +253,7 @@ function renderCompanyRow(c, openDealsCount) {
       <td>${c.web ? `<a href="${escapeAttr(c.web)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(c.web)}</a>` : '<span class="muted">-</span>'}</td>
       <td>${c.ico ? esc(c.ico) : '<span class="muted">-</span>'}</td>
       <td>${c.contacts ? c.contacts.length : 0}</td>
-      ${openDealsCount > 0 ? `<td><strong>${openDealsCount}</strong></td>` : ''}
+      ${openProjectsCount > 0 ? `<td><strong>${openProjectsCount}</strong></td>` : ''}
       <td class="actions-cell" onclick="event.stopPropagation()">
         <a href="#" class="edit-company" data-id="${c.id}">Edit</a>
         <a href="#" class="danger-link delete-company" data-id="${c.id}" data-name="${escapeAttr(c.name)}">Delete</a>

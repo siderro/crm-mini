@@ -140,6 +140,7 @@ export async function renderContactForm(container, id = null) {
           payload.user_id = user.id;
           const { data, error } = await sb.from('contacts').insert(payload).select().single();
           if (error) throw error;
+
           window.location.hash = `#/contacts/${data.id}`;
         }
       } catch (err) {

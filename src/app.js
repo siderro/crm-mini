@@ -7,15 +7,17 @@ import { renderCompanies } from './ui/companies.js';
 import { renderCompanyDetail } from './ui/companyDetail.js';
 import { renderCompanyForm } from './ui/companyForm.js';
 import { renderInbox } from './ui/inbox.js';
-import { renderDeals } from './ui/deals.js';
-import { renderDealDetail } from './ui/dealDetail.js';
-import { renderDealForm } from './ui/dealForm.js';
+import { renderProjects } from './ui/projects.js';
+import { renderProjectDetail } from './ui/projectDetail.js';
+import { renderProjectForm } from './ui/projectForm.js';
 import { renderDashboard } from './ui/dashboard.js';
+import { renderExtra } from './ui/extra.js';
+import { renderCombo } from './ui/combo.js';
 
 const app = document.getElementById('app');
 let currentUser = null;
 
-// ── Router ──
+// -- Router --
 
 function parseHash() {
   const hash = window.location.hash.replace(/^#\/?/, '') || '';
@@ -51,16 +53,20 @@ async function route() {
     await renderCompanies(app);
   } else if (parts[0] === 'inbox') {
     await renderInbox(app, currentUser);
-  } else if (parts[0] === 'deals' && parts[1] === 'new') {
-    await renderDealForm(app);
-  } else if (parts[0] === 'deals' && parts[1] && parts[2] === 'edit') {
-    await renderDealForm(app, parts[1]);
-  } else if (parts[0] === 'deals' && parts[1]) {
-    await renderDealDetail(app, parts[1]);
-  } else if (parts[0] === 'deals') {
-    await renderDeals(app);
+  } else if (parts[0] === 'projects' && parts[1] === 'new') {
+    await renderProjectForm(app);
+  } else if (parts[0] === 'projects' && parts[1] && parts[2] === 'edit') {
+    await renderProjectForm(app, parts[1]);
+  } else if (parts[0] === 'projects' && parts[1]) {
+    await renderProjectDetail(app, parts[1]);
+  } else if (parts[0] === 'projects') {
+    await renderProjects(app);
   } else if (parts[0] === 'contacts') {
     await renderContacts(app);
+  } else if (parts[0] === 'combo') {
+    await renderCombo(app);
+  } else if (parts[0] === 'extra') {
+    await renderExtra(app);
   } else {
     // Default: dashboard
     await renderDashboard(app);
@@ -71,18 +77,18 @@ async function renderNav() {
   const nav = document.getElementById('nav');
   const hash = window.location.hash || '#/';
 
-  // Get open deals sum
-  let dealsSumText = '';
+  // Get open projects sum
+  let projectsSumText = '';
   try {
-    const { data: openDeals } = await sb.from('deals')
+    const { data: openProjects } = await sb.from('projects')
       .select('amount')
       .in('status', ['open']);
 
-    const totalAmount = (openDeals || []).reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+    const totalAmount = (openProjects || []).reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
     const totalInK = Math.round(totalAmount / 1000);
-    if (totalInK > 0) dealsSumText = ` (${totalInK}k)`;
+    if (totalInK > 0) projectsSumText = ` (${totalInK}k)`;
   } catch (err) {
-    dealsSumText = '';
+    projectsSumText = '';
   }
 
   nav.innerHTML = `
@@ -90,9 +96,11 @@ async function renderNav() {
       <div class="nav-left">
         <a href="#/" class="nav-brand">CRM Mini</a>
         <a href="#/inbox" class="nav-link${hash.startsWith('#/inbox') ? ' active' : ''}">Inbox</a>
-        <a href="#/deals" class="nav-link${hash.startsWith('#/deals') ? ' active' : ''}">Deals${dealsSumText}</a>
+        <a href="#/projects" class="nav-link${hash.startsWith('#/projects') ? ' active' : ''}">Projects${projectsSumText}</a>
         <a href="#/contacts" class="nav-link${hash.startsWith('#/contacts') ? ' active' : ''}">Contacts</a>
         <a href="#/companies" class="nav-link${hash.startsWith('#/companies') ? ' active' : ''}">Companies</a>
+        <a href="#/combo" class="nav-link${hash.startsWith('#/combo') ? ' active' : ''}">+ Combo</a>
+        <a href="#/extra" class="nav-link${hash.startsWith('#/extra') ? ' active' : ''}">Extra</a>
       </div>
       <div class="nav-right">
         <span class="nav-user">${esc(currentUser.email)}</span>
@@ -106,7 +114,7 @@ async function renderNav() {
   });
 }
 
-// ── Init ──
+// -- Init --
 
 onAuthChange((user) => {
   currentUser = user;
