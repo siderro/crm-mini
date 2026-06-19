@@ -25,7 +25,11 @@
       "Bash(brew install *)",
       "Bash(fileicon set *)",
       "Bash(ls /Users/jakubgoldmann/Library/CloudStorage/Dropbox/Skripty/crm-mini/src/ui/deals*.js)",
-      "Bash(ls /Users/jakubgoldmann/Library/CloudStorage/Dropbox/Skripty/crm-mini/src/ui/project*.js)"
+      "Bash(ls /Users/jakubgoldmann/Library/CloudStorage/Dropbox/Skripty/crm-mini/src/ui/project*.js)",
+      "Bash(npm run *)",
+      "Bash(npx vite *)",
+      "Bash(grep *)",
+      "Skill(keybindings-help)"
     ]
   }
 }

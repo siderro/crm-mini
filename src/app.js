@@ -6,15 +6,17 @@ import { renderContactForm } from './ui/contactForm.js';
 import { renderCompanies } from './ui/companies.js';
 import { renderCompanyDetail } from './ui/companyDetail.js';
 import { renderCompanyForm } from './ui/companyForm.js';
-import { renderInbox } from './ui/inbox.js';
 import { renderProjects } from './ui/projects.js';
 import { renderProjectDetail } from './ui/projectDetail.js';
 import { renderProjectForm } from './ui/projectForm.js';
 import { renderDashboard } from './ui/dashboard.js';
 import { renderExtra } from './ui/extra.js';
 import { renderCombo } from './ui/combo.js';
+import { renderHeroes } from './ui/heroes.js';
+import { renderQuickEntry } from './ui/quickEntry.js';
 
 const app = document.getElementById('app');
+const quickEntryEl = document.getElementById('quick-entry');
 let currentUser = null;
 
 // -- Router --
@@ -28,9 +30,11 @@ function parseHash() {
 async function route() {
   if (!currentUser) {
     document.getElementById('nav').style.display = 'none';
+    quickEntryEl.style.display = 'none';
     renderLogin(app);
     return;
   }
+  quickEntryEl.style.display = '';
 
   document.getElementById('nav').style.display = '';
   await renderNav();
@@ -46,13 +50,11 @@ async function route() {
   } else if (parts[0] === 'companies' && parts[1] === 'new') {
     await renderCompanyForm(app);
   } else if (parts[0] === 'companies' && parts[1] && parts[2] === 'edit') {
-    await renderCompanyForm(app, parts[1]);
+    window.location.hash = `#/companies/${parts[1]}`;
   } else if (parts[0] === 'companies' && parts[1]) {
     await renderCompanyDetail(app, parts[1]);
   } else if (parts[0] === 'companies') {
     await renderCompanies(app);
-  } else if (parts[0] === 'inbox') {
-    await renderInbox(app, currentUser);
   } else if (parts[0] === 'projects' && parts[1] === 'new') {
     await renderProjectForm(app);
   } else if (parts[0] === 'projects' && parts[1] && parts[2] === 'edit') {
@@ -65,12 +67,23 @@ async function route() {
     await renderContacts(app);
   } else if (parts[0] === 'combo') {
     await renderCombo(app);
+  } else if (parts[0] === 'heroes') {
+    await renderHeroes(app);
   } else if (parts[0] === 'extra') {
     await renderExtra(app);
   } else {
     // Default: dashboard
     await renderDashboard(app);
   }
+
+  // Render quick entry panel on every page, with context from current route
+  const qeContext = {};
+  if (parts[0] === 'contacts' && parts[1] && parts[1] !== 'new' && parts[2] !== 'edit') {
+    qeContext.contactId = parts[1];
+  } else if (parts[0] === 'projects' && parts[1] && parts[1] !== 'new' && parts[2] !== 'edit') {
+    qeContext.projectId = parts[1];
+  }
+  renderQuickEntry(quickEntryEl, qeContext);
 }
 
 async function renderNav() {
@@ -95,10 +108,10 @@ async function renderNav() {
     <div class="nav-inner">
       <div class="nav-left">
         <a href="#/" class="nav-brand">CRM Mini</a>
-        <a href="#/inbox" class="nav-link${hash.startsWith('#/inbox') ? ' active' : ''}">Inbox</a>
         <a href="#/projects" class="nav-link${hash.startsWith('#/projects') ? ' active' : ''}">Projects${projectsSumText}</a>
         <a href="#/contacts" class="nav-link${hash.startsWith('#/contacts') ? ' active' : ''}">Contacts</a>
         <a href="#/companies" class="nav-link${hash.startsWith('#/companies') ? ' active' : ''}">Companies</a>
+        <a href="#/heroes" class="nav-link${hash.startsWith('#/heroes') ? ' active' : ''}">Heroes</a>
         <a href="#/combo" class="nav-link${hash.startsWith('#/combo') ? ' active' : ''}">+ Combo</a>
         <a href="#/extra" class="nav-link${hash.startsWith('#/extra') ? ' active' : ''}">Extra</a>
       </div>

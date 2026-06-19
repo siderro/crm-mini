@@ -1,6 +1,6 @@
 import { sb } from '../supabase.js';
-import { timeAgo } from '../utils/time.js';
 import { deleteWithUndo } from '../utils/undo.js';
+import { getTemperature } from '../utils/temperature.js';
 
 // Define status groups and labels
 const OPEN_STATUSES = ['open'];
@@ -22,14 +22,27 @@ export async function renderProjects(container) {
   container.innerHTML = '<div class="loading">Loading projects...</div>';
 
   try {
-    const { data: projects, error } = await sb.from('projects')
-      .select('*, contacts(first_name, last_name), companies(name)')
-      .order('updated_at', { ascending: false });
+    const [
+      { data: projects, error },
+      { data: contacts },
+      { data: companies },
+      { data: logRows },
+    ] = await Promise.all([
+      sb.from('projects').select('*, contacts(first_name, last_name), companies(name)').order('updated_at', { ascending: false }),
+      sb.from('contacts').select('id, first_name, last_name').order('last_name'),
+      sb.from('companies').select('id, name').order('name'),
+      sb.from('logs').select('project_id, logged_at, content').not('project_id', 'is', null).order('logged_at', { ascending: false }),
+    ]);
 
     if (error) throw error;
 
-    const { data: contacts } = await sb.from('contacts').select('id, first_name, last_name').order('last_name');
-    const { data: companies } = await sb.from('companies').select('id, name').order('name');
+    // Build project_id → { date, content } map
+    const lastLogMap = new Map();
+    for (const row of (logRows || [])) {
+      if (row.project_id && !lastLogMap.has(row.project_id)) {
+        lastLogMap.set(row.project_id, { date: row.logged_at, content: row.content });
+      }
+    }
 
     const list = projects || [];
     const contactsList = contacts || [];
@@ -55,84 +68,33 @@ export async function renderProjects(container) {
         <h2 id="project-form-title">New Project</h2>
         <form id="project-form">
           <input type="hidden" id="project-edit-id" value="">
-          <div class="form-row">
-            <div class="form-group">
-              <label for="d-title">Project Title *</label>
-              <input type="text" id="d-title" class="input" required>
-            </div>
-            <div class="form-group">
-              <label for="d-amount">Amount</label>
-              <input type="number" id="d-amount" class="input" step="0.01" placeholder="0.00">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label for="d-status">Status *</label>
-              <select id="d-status" class="input" required>
-                <option value="open">Open</option>
-                <option value="frozen">Frozen</option>
-                <option value="won">Won</option>
-                <option value="lost">Lost</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="d-expected">Expected Close</label>
-              <input type="date" id="d-expected" class="input">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label for="d-contact">Contact</label>
-              <select id="d-contact" class="input">
-                <option value="">-- None --</option>
-                ${contactsList.map(c => `<option value="${c.id}">${esc(c.first_name)} ${esc(c.last_name)}</option>`).join('')}
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="d-company">Company</label>
-              <select id="d-company" class="input">
-                <option value="">-- None --</option>
-                ${companiesList.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}
-              </select>
-            </div>
-          </div>
           <div class="form-group">
-            <label for="d-notes">Notes</label>
-            <textarea id="d-notes" class="input" rows="3"></textarea>
+            <label for="d-title">Title *</label>
+            <input type="text" id="d-title" class="input" required>
           </div>
           <div class="form-actions">
-            <button type="submit" class="btn btn-primary" id="project-submit-btn">Create Project</button>
+            <button type="submit" class="btn btn-primary" id="project-submit-btn">Save</button>
             <button type="button" id="project-cancel-btn" class="btn btn-secondary">Cancel</button>
           </div>
           <div class="form-error" id="project-form-error"></div>
         </form>
       </div>
 
-      ${renderGroupedProjects(groupedProjects, list)}
+      ${renderGroupedProjects(groupedProjects, list, lastLogMap)}
     `;
 
     const formWrap = container.querySelector('#project-form-wrap');
     const form = container.querySelector('#project-form');
 
-    function showForm(project = null) {
+    function showForm() {
       formWrap.style.display = '';
-      container.querySelector('#project-form-title').textContent = project ? 'Edit Project' : 'New Project';
-      container.querySelector('#project-submit-btn').textContent = project ? 'Save Changes' : 'Create Project';
-      container.querySelector('#project-edit-id').value = project?.id || '';
-      container.querySelector('#d-title').value = project?.title || '';
-      container.querySelector('#d-amount').value = project?.amount || '';
-      container.querySelector('#d-status').value = project?.status || 'open';
-      container.querySelector('#d-expected').value = project?.expected_close || '';
-      container.querySelector('#d-contact').value = project?.contact_id || '';
-      container.querySelector('#d-company').value = project?.company_id || '';
-      container.querySelector('#d-notes').value = project?.notes || '';
+      container.querySelector('#d-title').value = '';
       container.querySelector('#d-title').focus();
     }
 
     function hideForm() {
       formWrap.style.display = 'none';
       form.reset();
-      container.querySelector('#project-edit-id').value = '';
       container.querySelector('#project-form-error').textContent = '';
     }
 
@@ -142,42 +104,18 @@ export async function renderProjects(container) {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const title = container.querySelector('#d-title').value.trim();
-      if (!title) { container.querySelector('#project-form-error').textContent = 'Project title is required'; return; }
-
-      const editId = container.querySelector('#project-edit-id').value;
-      const payload = {
-        title,
-        amount: container.querySelector('#d-amount').value || null,
-        status: container.querySelector('#d-status').value,
-        expected_close: container.querySelector('#d-expected').value || null,
-        contact_id: container.querySelector('#d-contact').value || null,
-        company_id: container.querySelector('#d-company').value || null,
-        notes: container.querySelector('#d-notes').value.trim() || null,
-      };
+      if (!title) { container.querySelector('#project-form-error').textContent = 'Title is required'; return; }
 
       try {
-        if (editId) {
-          const { error } = await sb.from('projects').update(payload).eq('id', editId);
-          if (error) throw error;
-        } else {
-          const user = (await sb.auth.getUser()).data.user;
-          payload.user_id = user.id;
-          const { error } = await sb.from('projects').insert(payload);
-          if (error) throw error;
-        }
-        await renderProjects(container);
+        const user = (await sb.auth.getUser()).data.user;
+        const { data, error } = await sb.from('projects')
+          .insert({ title, status: 'open', user_id: user.id })
+          .select().single();
+        if (error) throw error;
+        window.location.hash = `#/projects/${data.id}`;
       } catch (err) {
         container.querySelector('#project-form-error').textContent = 'Error: ' + err.message;
       }
-    });
-
-    // Edit links
-    container.querySelectorAll('.edit-project').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const d = list.find(x => x.id === btn.dataset.id);
-        if (d) showForm(d);
-      });
     });
 
     // Delete links
@@ -248,9 +186,7 @@ function groupProjectsByStatus(projects) {
   return grouped;
 }
 
-function renderGroupedProjects(groupedProjects, allProjects) {
-  const maxValue = Math.max(...allProjects.map(d => parseFloat(d.amount) || 0), 1);
-
+function renderGroupedProjects(groupedProjects, allProjects, lastLogMap) {
   return Object.values(groupedProjects).map(group => {
     if (group.projects.length === 0) return '';
 
@@ -262,14 +198,14 @@ function renderGroupedProjects(groupedProjects, allProjects) {
             <thead>
               <tr>
                 <th>Project</th>
-                <th>Status</th>
                 <th>Value</th>
-                <th>Created/Updated</th>
+                <th>Contact</th>
+                <th>Temp</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              ${group.projects.map(d => renderProjectRow(d, maxValue)).join('')}
+              ${group.projects.map(d => renderProjectRow(d, lastLogMap)).join('')}
             </tbody>
           </table>
         </div>
@@ -278,25 +214,29 @@ function renderGroupedProjects(groupedProjects, allProjects) {
   }).join('');
 }
 
-function renderProjectRow(d, maxValue) {
-  const createdDays = getDaysAgo(d.created_at);
-  const modifiedDays = getDaysAgo(d.updated_at);
+function renderProjectRow(d, lastLogMap) {
   const amountNum = parseFloat(d.amount) || 0;
-  const amount = amountNum.toLocaleString('cs-CZ', {minimumFractionDigits: 0, maximumFractionDigits: 0});
-  const valuePct = maxValue > 0 ? (amountNum / maxValue) * 100 : 0;
+  const amount = amountNum ? `${Math.round(amountNum / 1000)}K` : '-';
+  const logInfo = lastLogMap.get(d.id);
+  const temp = getTemperature(logInfo?.date);
+  const snippet = logInfo?.content ? truncate(logInfo.content, 50) : '';
 
   const isOpenStatus = OPEN_STATUSES.includes(d.status);
   const isFrozen = d.status === 'frozen';
 
-  const statusLabel = STATUS_LABELS[d.status] || d.status;
-  const progressBar = renderTextProgressBar(valuePct);
+  const contactName = d.contacts
+    ? `${esc(d.contacts.first_name)} ${esc(d.contacts.last_name)}`
+    : '<span class="muted">-</span>';
 
   return `
-    <tr class="clickable-row" data-id="${d.id}">
-      <td><strong>${esc(d.title)}</strong></td>
-      <td>${statusLabel}</td>
-      <td><span class="text-progress-bar">${progressBar}</span> ${amount} Kc</td>
-      <td>(${createdDays}d / ${modifiedDays}d)</td>
+    <tr class="clickable-row ${temp.css}" data-id="${d.id}">
+      <td>
+        <strong>${esc(d.title)}</strong>
+        ${snippet ? `<div class="log-snippet">${esc(snippet)}</div>` : ''}
+      </td>
+      <td>${amount}</td>
+      <td>${contactName}</td>
+      <td class="${temp.css}">${temp.label}</td>
       <td class="actions-cell" onclick="event.stopPropagation()">
         ${isOpenStatus ? `<a href="#" class="freeze-project" data-id="${d.id}" data-status="${d.status}">Freeze</a>` : ''}
         ${isFrozen ? `<a href="#" class="unfreeze-project" data-id="${d.id}">Unfreeze</a>` : ''}
@@ -304,6 +244,11 @@ function renderProjectRow(d, maxValue) {
       </td>
     </tr>
   `;
+}
+
+function truncate(str, len) {
+  if (!str) return '';
+  return str.length > len ? str.slice(0, len) + '...' : str;
 }
 
 function esc(s) {
@@ -318,23 +263,3 @@ function escapeAttr(s) {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function getDaysAgo(dateStr) {
-  if (!dateStr) return 0;
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffTime = Math.abs(now - date);
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays;
-}
-
-function renderTextProgressBar(percentage) {
-  const pct = Math.round(percentage);
-  const totalBlocks = 10;
-  const filledBlocks = Math.round((pct / 100) * totalBlocks);
-  const emptyBlocks = totalBlocks - filledBlocks;
-
-  const filled = '\u2588'.repeat(filledBlocks);
-  const empty = '\u2591'.repeat(emptyBlocks);
-
-  return `${filled}${empty}`;
-}

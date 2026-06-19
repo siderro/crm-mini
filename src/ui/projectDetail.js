@@ -1,47 +1,39 @@
 import { sb } from '../supabase.js';
 import { timeAgo } from '../utils/time.js';
 import { deleteWithUndo } from '../utils/undo.js';
+import { renderLogTimeline, attachLogListeners } from './logEntry.js';
+import { debounce } from '../utils/debounce.js';
 
-const OPEN_STATUSES = ['open'];
+const STATUS_OPTIONS = ['open', 'frozen', 'won', 'lost'];
 
 export async function renderProjectDetail(container, id) {
   container.innerHTML = '<div class="loading">Loading...</div>';
 
   try {
-    // First get the project
-    const { data: project, error } = await sb.from('projects').select('*').eq('id', id).single();
+    const [
+      { data: project, error },
+      { data: logs },
+      { data: contacts },
+      { data: companies },
+    ] = await Promise.all([
+      sb.from('projects').select('*').eq('id', id).single(),
+      sb.from('logs').select('*, contacts(first_name, last_name)').eq('project_id', id).order('logged_at', { ascending: false }).order('created_at', { ascending: false }),
+      sb.from('contacts').select('id, first_name, last_name').order('last_name'),
+      sb.from('companies').select('id, name').order('name'),
+    ]);
 
     if (error || !project) {
       container.innerHTML = '<div class="error">Project not found. <a href="#/projects">Back to list</a></div>';
       return;
     }
 
-    // Get contact if project has contact_id
-    let contact = null;
-    if (project.contact_id) {
-      const { data: c } = await sb.from('contacts').select('id, first_name, last_name, email').eq('id', project.contact_id).single();
-      contact = c;
-    }
+    // Next step
+    const nextStepLog = (logs || []).find(l => l.content?.startsWith('>'));
+    const nextStepHtml = nextStepLog
+      ? `<div class="next-step"><span class="next-step-label">NEXT:</span> ${esc(nextStepLog.content.slice(1).trim())} <span class="muted">${formatDate(nextStepLog.logged_at)}</span></div>`
+      : '';
 
-    // Get company if project has company_id
-    let company = null;
-    if (project.company_id) {
-      const { data: c } = await sb.from('companies').select('id, name').eq('id', project.company_id).single();
-      company = c;
-    }
-
-    const isOpenStatus = OPEN_STATUSES.includes(project.status);
-    const isFrozen = project.status === 'frozen';
-
-    // Build compact metadata line
-    const metaParts = [];
-    if (project.amount) metaParts.push(`${Math.round(parseFloat(project.amount) / 1000)}k Kc`);
-    metaParts.push(`<span class="status-badge status-${project.status}">${getStatusLabel(project.status)}</span>`);
-    if (project.expected_close) metaParts.push(`Exp: ${new Date(project.expected_close).toLocaleDateString('cs-CZ')}`);
-    if (contact) metaParts.push(`Contact: <a href="#/contacts/${contact.id}">${esc(contact.first_name)} ${esc(contact.last_name)}</a>`);
-    if (company) metaParts.push(`Company: <a href="#/companies/${company.id}">${esc(company.name)}</a>`);
-    metaParts.push(`Upd: ${timeAgo(project.updated_at)}`);
-    metaParts.push(`Add: ${timeAgo(project.created_at)}`);
+    const logTimelineHtml = renderLogTimeline(logs || [], 'project', { contacts: contacts || [] });
 
     container.innerHTML = `
       <div class="detail-page">
@@ -50,87 +42,77 @@ export async function renderProjectDetail(container, id) {
             <a href="#/projects" class="btn btn-back">&larr; Back</a>
             <h1>${esc(project.title)}</h1>
             <div class="detail-actions">
-              ${isOpenStatus ? `<button id="freeze-project" class="btn btn-freeze">Freeze</button>` : ''}
-              ${isFrozen ? `<button id="unfreeze-project" class="btn btn-success">Unfreeze</button>` : ''}
-              <button id="edit-project" class="btn btn-secondary">Edit</button>
               <button id="delete-project" class="btn btn-danger">Del</button>
             </div>
           </div>
         </div>
 
-        <div class="compact-meta">${metaParts.join(' · ')}</div>
+        ${nextStepHtml}
 
-        <div class="detail-grid">
-          <div class="detail-main">
-            <div class="card">
-              <div class="section-bar">Notes</div>
-              <div class="notes-toolbar">
-                <button id="add-timestamp-btn" class="btn btn-sm btn-secondary">Add timestamp</button>
-                <span id="notes-status"></span>
-                <button id="save-notes-btn" class="btn btn-sm btn-primary">Save</button>
-              </div>
-              <textarea id="project-notes" class="input notes-textarea" rows="10">${esc(project.notes || '')}</textarea>
-            </div>
-          </div>
+        <div class="inline-fields-vertical">
+          <label>Amount <input type="number" id="f-amount" class="input inline-input" value="${project.amount || ''}" placeholder="—" step="1"></label>
+          <label>Status
+            <select id="f-status" class="input inline-input">
+              ${STATUS_OPTIONS.map(s => `<option value="${s}"${project.status === s ? ' selected' : ''}>${s.charAt(0).toUpperCase() + s.slice(1)}</option>`).join('')}
+            </select>
+          </label>
+          <label>Expected close <input type="date" id="f-expected" class="input inline-input" value="${project.expected_close || ''}">${project.expected_close && project.expected_close < new Date().toISOString().slice(0, 10) ? ` <strong class="overdue-label">OVERDUE</strong>` : ''}</label>
+          <label>Contact
+            <select id="f-contact" class="input inline-input">
+              <option value="">—</option>
+              ${(contacts || []).map(c => `<option value="${c.id}"${project.contact_id === c.id ? ' selected' : ''}>${esc(c.first_name)} ${esc(c.last_name)}</option>`).join('')}
+            </select>
+          </label>
+          <label>Company
+            <select id="f-company" class="input inline-input">
+              <option value="">—</option>
+              ${(companies || []).map(c => `<option value="${c.id}"${project.company_id === c.id ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}
+            </select>
+          </label>
+          <span id="inline-status" class="inline-status"></span>
         </div>
+
+        <div class="section-bar">Log</div>
+        ${logTimelineHtml}
       </div>
     `;
 
-    // Save notes
-    container.querySelector('#save-notes-btn').addEventListener('click', async () => {
-      const notes = container.querySelector('#project-notes').value;
-      const status = container.querySelector('#notes-status');
-      const { error: updErr } = await sb.from('projects').update({ notes: notes || null }).eq('id', id);
-      if (updErr) {
-        status.textContent = 'Error: ' + updErr.message;
-        status.style.color = 'var(--danger, red)';
+    // Autosave
+    const statusEl = container.querySelector('#inline-status');
+
+    async function saveField(field, value) {
+      const { error } = await sb.from('projects').update({ [field]: value || null }).eq('id', id);
+      if (error) {
+        statusEl.textContent = 'Error';
+        statusEl.style.color = 'var(--danger)';
       } else {
-        status.textContent = 'Saved';
-        status.style.color = 'var(--success, green)';
-        setTimeout(() => { status.textContent = ''; }, 2000);
+        statusEl.textContent = 'Saved';
+        statusEl.style.color = 'var(--success)';
+        setTimeout(() => { statusEl.textContent = ''; }, 2000);
       }
-    });
-
-    // Add timestamp
-    container.querySelector('#add-timestamp-btn').addEventListener('click', () => {
-      const textarea = container.querySelector('#project-notes');
-      const date = new Date().toLocaleDateString('cs-CZ');
-      const pos = textarea.selectionStart;
-      const val = textarea.value;
-      const stamp = `\n[${date}] `;
-      textarea.value = val.slice(0, pos) + stamp + val.slice(pos);
-      textarea.focus();
-      textarea.selectionStart = textarea.selectionEnd = pos + stamp.length;
-    });
-
-    // Freeze project
-    const freezeBtn = container.querySelector('#freeze-project');
-    if (freezeBtn) {
-      freezeBtn.addEventListener('click', async () => {
-        const { error } = await sb.from('projects')
-          .update({ status: 'frozen' })
-          .eq('id', id);
-        if (error) { alert('Error: ' + error.message); return; }
-        await renderProjectDetail(container, id);
-      });
     }
 
-    // Unfreeze project
-    const unfreezeBtn = container.querySelector('#unfreeze-project');
-    if (unfreezeBtn) {
-      unfreezeBtn.addEventListener('click', async () => {
-        const { error } = await sb.from('projects')
-          .update({ status: 'open' })
-          .eq('id', id);
-        if (error) { alert('Error: ' + error.message); return; }
-        await renderProjectDetail(container, id);
-      });
-    }
+    const debouncedSaveAmount = debounce(() => saveField('amount', container.querySelector('#f-amount').value), 1000);
+    container.querySelector('#f-amount').addEventListener('input', debouncedSaveAmount);
 
-    // Edit project
-    container.querySelector('#edit-project').addEventListener('click', () => {
-      window.location.hash = `#/projects/${id}/edit`;
+    container.querySelector('#f-status').addEventListener('change', () => {
+      saveField('status', container.querySelector('#f-status').value);
     });
+    container.querySelector('#f-expected').addEventListener('change', () => {
+      saveField('expected_close', container.querySelector('#f-expected').value);
+    });
+    container.querySelector('#f-contact').addEventListener('change', () => {
+      saveField('contact_id', container.querySelector('#f-contact').value);
+    });
+    container.querySelector('#f-company').addEventListener('change', () => {
+      saveField('company_id', container.querySelector('#f-company').value);
+    });
+
+    // Log edit + delete listeners
+    attachLogListeners(container, () => renderProjectDetail(container, id));
+
+    // Refresh on log-created
+    window.addEventListener('log-created', () => renderProjectDetail(container, id), { once: true });
 
     // Delete project
     container.querySelector('#delete-project').addEventListener('click', async () => {
@@ -145,14 +127,10 @@ export async function renderProjectDetail(container, id) {
   }
 }
 
-function getStatusLabel(status) {
-  const labels = {
-    'open': 'Open',
-    'frozen': 'Frozen',
-    'won': 'Won',
-    'lost': 'Lost'
-  };
-  return labels[status] || status;
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`;
 }
 
 function esc(s) {

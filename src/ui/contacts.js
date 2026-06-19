@@ -1,7 +1,7 @@
 import { sb } from '../supabase.js';
 import { debounce } from '../utils/debounce.js';
 import { exportCSV } from '../utils/csv.js';
-import { timeAgo } from '../utils/time.js';
+import { getTemperature } from '../utils/temperature.js';
 
 const OPEN_STATUSES = ['open'];
 
@@ -34,6 +34,18 @@ async function fetchCompanies() {
   return data || [];
 }
 
+async function fetchLastLogs() {
+  const { data } = await sb.from('logs').select('contact_id, logged_at, content').not('contact_id', 'is', null).order('logged_at', { ascending: false });
+  // Deduplicate: keep first (most recent) per contact
+  const seen = new Map();
+  for (const row of (data || [])) {
+    if (!seen.has(row.contact_id)) {
+      seen.set(row.contact_id, { date: row.logged_at, content: row.content });
+    }
+  }
+  return Array.from(seen.entries()).map(([contact_id, info]) => ({ contact_id, last_date: info.date, content: info.content }));
+}
+
 async function fetchOpenDealLinks() {
   // Get contacts with direct open projects
   const { data: contactDeals } = await sb.from('projects')
@@ -62,11 +74,18 @@ export async function renderContacts(container) {
   container.innerHTML = '<div class="loading">Loading contacts...</div>';
 
   try {
-    const [contacts, companies, openDealLinks] = await Promise.all([
+    const [contacts, companies, openDealLinks, lastLogs] = await Promise.all([
       fetchContacts(),
       fetchCompanies(),
       fetchOpenDealLinks(),
+      fetchLastLogs(),
     ]);
+
+    // Build contact_id → { date, content } map
+    const lastLogMap = new Map();
+    for (const row of lastLogs) {
+      if (row.contact_id) lastLogMap.set(row.contact_id, { date: row.last_date, content: row.content });
+    }
 
     // Group contacts
     const linkedToOpenDeals = contacts.filter(c =>
@@ -97,26 +116,17 @@ export async function renderContacts(container) {
         </div>
       </div>
 
-      <div class="contacts-layout">
-        <div class="contacts-main">
-          <div class="toolbar">
-            <input type="search" id="search-input" class="input" placeholder="Search name, email, notes..." value="${escapeAttr(currentSearch)}">
-            <select id="filter-select" class="input">
-              <option value="all"${currentFilter === 'all' ? ' selected' : ''}>All contacts</option>
-              <option value="with_email"${currentFilter === 'with_email' ? ' selected' : ''}>With email</option>
-              <option value="with_phone"${currentFilter === 'with_phone' ? ' selected' : ''}>With phone</option>
-              <option value="with_company"${currentFilter === 'with_company' ? ' selected' : ''}>With company</option>
-            </select>
-          </div>
-
-          ${renderGroupedContacts(linkedToOpenDeals, others)}
-        </div>
-
-        <div class="contacts-sidebar">
-          <h2 class="group-heading">Starred <span class="badge">0</span></h2>
-          <div class="empty-state muted">No starred contacts yet.</div>
-        </div>
+      <div class="toolbar">
+        <input type="search" id="search-input" class="input" placeholder="Search name, email, notes..." value="${escapeAttr(currentSearch)}">
+        <select id="filter-select" class="input">
+          <option value="all"${currentFilter === 'all' ? ' selected' : ''}>All contacts</option>
+          <option value="with_email"${currentFilter === 'with_email' ? ' selected' : ''}>With email</option>
+          <option value="with_phone"${currentFilter === 'with_phone' ? ' selected' : ''}>With phone</option>
+          <option value="with_company"${currentFilter === 'with_company' ? ' selected' : ''}>With company</option>
+        </select>
       </div>
+
+      ${renderGroupedContacts(linkedToOpenDeals, others, lastLogMap)}
     `;
 
     // Event listeners
@@ -165,7 +175,7 @@ export async function renderContacts(container) {
   }
 }
 
-function renderGroupedContacts(linkedToOpenDeals, others) {
+function renderGroupedContacts(linkedToOpenDeals, others, lastLogMap) {
   let html = '';
 
   // Group 1: Contacts linked to open projects
@@ -173,7 +183,7 @@ function renderGroupedContacts(linkedToOpenDeals, others) {
     html += `
       <div class="deal-group">
         <h2 class="group-heading">Open Projects <span class="badge">${linkedToOpenDeals.length}</span></h2>
-        ${renderContactTable(linkedToOpenDeals)}
+        ${renderContactTable(linkedToOpenDeals, lastLogMap)}
       </div>
     `;
   }
@@ -183,7 +193,7 @@ function renderGroupedContacts(linkedToOpenDeals, others) {
     html += `
       <div class="deal-group">
         <h2 class="group-heading">Other <span class="badge">${others.length}</span></h2>
-        ${renderContactTable(others)}
+        ${renderContactTable(others, lastLogMap)}
       </div>
     `;
   }
@@ -195,7 +205,7 @@ function renderGroupedContacts(linkedToOpenDeals, others) {
   return html;
 }
 
-function renderContactTable(contacts) {
+function renderContactTable(contacts, lastLogMap) {
   return `
     <div class="table-wrap">
       <table class="data-table table-contacts">
@@ -205,24 +215,36 @@ function renderContactTable(contacts) {
             <th class="sortable" data-col="email">Email${sortIcon('email')}</th>
             <th class="sortable" data-col="phone">Phone${sortIcon('phone')}</th>
             <th>Company</th>
-            <th>Updated</th>
+            <th>Temp</th>
           </tr>
         </thead>
         <tbody>
           ${contacts.map(c => {
+            const logInfo = lastLogMap.get(c.id);
+            const temp = getTemperature(logInfo?.date);
+            const snippet = logInfo?.content ? truncate(logInfo.content, 50) : '';
+            const incomplete = !c.email || !c.phone || !c.company_id;
             return `
-            <tr class="clickable-row" data-id="${c.id}">
-              <td><strong>${esc(c.first_name)} ${esc(c.last_name)}</strong></td>
+            <tr class="clickable-row ${temp.css}" data-id="${c.id}">
+              <td>
+                <strong>${esc(c.first_name)} ${esc(c.last_name)}</strong>${incomplete ? ' <span class="incomplete-badge">[!]</span>' : ''}
+                ${snippet ? `<div class="log-snippet">${esc(snippet)}</div>` : ''}
+              </td>
               <td>${c.email ? `<a href="mailto:${escapeAttr(c.email)}" onclick="event.stopPropagation()">${esc(c.email)}</a>` : '<span class="muted">-</span>'}</td>
               <td>${c.phone ? esc(c.phone) : '<span class="muted">-</span>'}</td>
               <td>${c.companies?.name ? esc(c.companies.name) : '<span class="muted">-</span>'}</td>
-              <td>${c.updated_at ? timeAgo(c.updated_at) : '<span class="muted">-</span>'}</td>
+              <td class="${temp.css}">${temp.label}</td>
             </tr>
           `}).join('')}
         </tbody>
       </table>
     </div>
   `;
+}
+
+function truncate(str, len) {
+  if (!str) return '';
+  return str.length > len ? str.slice(0, len) + '...' : str;
 }
 
 function esc(s) {
