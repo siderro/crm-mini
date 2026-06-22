@@ -1,5 +1,5 @@
 import { sb } from '../supabase.js';
-import { getTemperature } from '../utils/temperature.js';
+import { getTemperature, renderTempLegend } from '../utils/temperature.js';
 
 export async function renderDashboard(container) {
   container.innerHTML = '<div class="loading">Loading...</div>';
@@ -105,14 +105,16 @@ export async function renderDashboard(container) {
       .sort((a, b) => b.temp.days - a.temp.days)
       .slice(0, 5);
 
-    // Next steps
+    // Next steps — only if the most recent log per contact starts with >
     const nextSteps = [];
-    const seenNextContacts = new Set();
+    const seenContacts = new Set();
     for (const row of (contactLogs || [])) {
-      if (row.content?.startsWith('>') && row.contact_id && !seenNextContacts.has(row.contact_id)) {
-        seenNextContacts.add(row.contact_id);
-        const contact = allContacts.find(c => c.id === row.contact_id);
-        if (contact) nextSteps.push({ contact, content: row.content.slice(1).trim(), date: row.logged_at });
+      if (row.contact_id && !seenContacts.has(row.contact_id)) {
+        seenContacts.add(row.contact_id);
+        if (row.content?.startsWith('>')) {
+          const contact = allContacts.find(c => c.id === row.contact_id);
+          if (contact) nextSteps.push({ contact, content: row.content.slice(1).trim(), date: row.logged_at });
+        }
       }
     }
 
@@ -139,6 +141,7 @@ export async function renderDashboard(container) {
           <span>${allContacts.length} contacts &middot; <span class="temp-hot">${activeContacts} active</span> &middot; ${warmContacts} warm &middot; <strong>${coldContacts} cold</strong></span>
           <span>${openProjectsList.length} open (${fmtK(openValue)}) &middot; ${frozenProjectsList.length} frozen (${fmtK(frozenValue)})${wonHtml ? ` &middot; ${wonHtml}` : ''}</span>
           <span>This week: ${thisWeekCount} logs &middot; ${thisWeekContacts} contacts${lastWeekCount ? ` &middot; last week: ${lastWeekCount}` : ''}${streak > 1 ? ` &middot; ${streak}-day streak` : ''}</span>
+          ${renderTempLegend()}
         </div>
 
         <div class="dashboard-main">
@@ -188,7 +191,7 @@ export async function renderDashboard(container) {
                           <tr class="clickable-row ${c.temp.css}" data-href="#/contacts/${c.id}">
                             <td>
                               <strong>${esc(c.first_name)} ${esc(c.last_name)}</strong>
-                              ${c.lastContent ? `<div class="log-snippet">${esc(truncate(c.lastContent, 40))}</div>` : ''}
+                              ${c.lastContent ? `<div class="log-snippet">${esc(truncate(c.lastContent, 80))}</div>` : ''}
                             </td>
                             <td>${c.companies?.name ? esc(c.companies.name) : '<span class="muted">-</span>'}</td>
                             <td class="${c.temp.css}">${c.temp.label}</td>
@@ -211,7 +214,7 @@ export async function renderDashboard(container) {
                           <tr class="clickable-row ${p.temp.css}" data-href="#/projects/${p.id}">
                             <td>
                               <strong>${esc(p.title)}</strong>
-                              ${p.lastContent ? `<div class="log-snippet">${esc(truncate(p.lastContent, 40))}</div>` : ''}
+                              ${p.lastContent ? `<div class="log-snippet">${esc(truncate(p.lastContent, 80))}</div>` : ''}
                             </td>
                             <td>${p.amount ? fmtK(parseFloat(p.amount)) : '-'}</td>
                             <td>${p.contacts ? `${esc(p.contacts.first_name)} ${esc(p.contacts.last_name)}` : '<span class="muted">-</span>'}</td>

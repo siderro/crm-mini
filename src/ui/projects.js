@@ -219,7 +219,7 @@ function renderProjectRow(d, lastLogMap) {
   const amount = amountNum ? `${Math.round(amountNum / 1000)}K` : '-';
   const logInfo = lastLogMap.get(d.id);
   const temp = getTemperature(logInfo?.date);
-  const snippet = logInfo?.content ? truncate(logInfo.content, 50) : '';
+  const snippet = logInfo?.content ? truncate(logInfo.content, 80) : '';
 
   const isOpenStatus = OPEN_STATUSES.includes(d.status);
   const isFrozen = d.status === 'frozen';

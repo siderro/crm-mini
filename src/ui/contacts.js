@@ -222,7 +222,7 @@ function renderContactTable(contacts, lastLogMap) {
           ${contacts.map(c => {
             const logInfo = lastLogMap.get(c.id);
             const temp = getTemperature(logInfo?.date);
-            const snippet = logInfo?.content ? truncate(logInfo.content, 50) : '';
+            const snippet = logInfo?.content ? truncate(logInfo.content, 80) : '';
             const incomplete = !c.email || !c.phone || !c.company_id;
             return `
             <tr class="clickable-row ${temp.css}" data-id="${c.id}">

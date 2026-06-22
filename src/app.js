@@ -16,28 +16,28 @@ import { renderHeroes } from './ui/heroes.js';
 import { renderQuickEntry } from './ui/quickEntry.js';
 
 const app = document.getElementById('app');
+const brand = document.getElementById('brand');
 const quickEntryEl = document.getElementById('quick-entry');
 let currentUser = null;
+let clockInterval = null;
 
 // -- Router --
 
 function parseHash() {
   const hash = window.location.hash.replace(/^#\/?/, '') || '';
-  const parts = hash.split('/').filter(Boolean);
-  return parts;
+  return hash.split('/').filter(Boolean);
 }
 
 async function route() {
   if (!currentUser) {
-    document.getElementById('nav').style.display = 'none';
+    brand.style.display = 'none';
     quickEntryEl.style.display = 'none';
     renderLogin(app);
     return;
   }
+  brand.style.display = '';
   quickEntryEl.style.display = '';
-
-  document.getElementById('nav').style.display = '';
-  await renderNav();
+  await renderBrand();
 
   const parts = parseHash();
 
@@ -72,11 +72,10 @@ async function route() {
   } else if (parts[0] === 'extra') {
     await renderExtra(app);
   } else {
-    // Default: dashboard
     await renderDashboard(app);
   }
 
-  // Render quick entry panel on every page, with context from current route
+  // Quick entry with context
   const qeContext = {};
   if (parts[0] === 'contacts' && parts[1] && parts[1] !== 'new' && parts[2] !== 'edit') {
     qeContext.contactId = parts[1];
@@ -86,45 +85,87 @@ async function route() {
   renderQuickEntry(quickEntryEl, qeContext);
 }
 
-async function renderNav() {
-  const nav = document.getElementById('nav');
+async function renderBrand() {
   const hash = window.location.hash || '#/';
 
-  // Get open projects sum
   let projectsSumText = '';
   try {
-    const { data: openProjects } = await sb.from('projects')
-      .select('amount')
-      .in('status', ['open']);
+    const { data: openProjects } = await sb.from('projects').select('amount').in('status', ['open']);
+    const total = (openProjects || []).reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+    const totalK = Math.round(total / 1000);
+    if (totalK > 0) projectsSumText = ` ${totalK}K`;
+  } catch (e) {}
 
-    const totalAmount = (openProjects || []).reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
-    const totalInK = Math.round(totalAmount / 1000);
-    if (totalInK > 0) projectsSumText = ` (${totalInK}k)`;
-  } catch (err) {
-    projectsSumText = '';
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const timeStr = now.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const dayStr = now.toLocaleDateString('en-US', { weekday: 'long' });
+
+  const logo = `<span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593</span><span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593</span>
+<span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593\u2593\u2593\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593</span>
+<span class="black">\u2593\u2593</span><span class="dgray">\u2593\u2593</span><span class="white">\u2593\u2593</span><span class="dgray">\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593</span>
+<span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593\u2593\u2593\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593</span>
+<span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593\u2593\u2593\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593</span>
+<span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593</span>
+<span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593</span><span class="black">\u2593\u2593</span>
+<span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593</span><span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593</span><span class="brown">\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593</span>
+<span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593</span><span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593</span><span class="brown">\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593</span>`;
+
+  function navLink(href, label) {
+    const active = hash.startsWith(href) || (href === '#/' && (hash === '#/' || hash === ''));
+    return `<a href="${href}" class="${active ? 'active' : ''}">${label}</a>`;
   }
 
-  nav.innerHTML = `
-    <div class="nav-inner">
-      <div class="nav-left">
-        <a href="#/" class="nav-brand">CRM Mini</a>
-        <a href="#/projects" class="nav-link${hash.startsWith('#/projects') ? ' active' : ''}">Projects${projectsSumText}</a>
-        <a href="#/contacts" class="nav-link${hash.startsWith('#/contacts') ? ' active' : ''}">Contacts</a>
-        <a href="#/companies" class="nav-link${hash.startsWith('#/companies') ? ' active' : ''}">Companies</a>
-        <a href="#/heroes" class="nav-link${hash.startsWith('#/heroes') ? ' active' : ''}">Heroes</a>
-        <a href="#/combo" class="nav-link${hash.startsWith('#/combo') ? ' active' : ''}">+ Combo</a>
-        <a href="#/extra" class="nav-link${hash.startsWith('#/extra') ? ' active' : ''}">Extra</a>
-      </div>
-      <div class="nav-right">
-        <span class="nav-user">${esc(currentUser.email)}</span>
-        <button id="sign-out-btn" class="btn btn-sm btn-secondary">Sign out</button>
-      </div>
+  brand.innerHTML = `
+    <div class="brand-logo">${logo}</div>
+    <div class="brand-name">BREVIS</div>
+    <div class="brand-time">
+      <div id="brand-date">${dateStr}</div>
+      <div id="brand-time">${timeStr}</div>
+      <div>${dayStr}</div>
     </div>
+    <div class="brand-sep">────────────────</div>
+    <div class="brand-nav">
+      ${navLink('#/', 'Dashboard')}
+      ${navLink('#/projects', 'Projects' + projectsSumText)}
+      ${navLink('#/contacts', 'Contacts')}
+      ${navLink('#/companies', 'Companies')}
+      ${navLink('#/heroes', 'Heroes')}
+      ${navLink('#/combo', '+ Combo')}
+      ${navLink('#/extra', 'Extra')}
+    </div>
+    <div class="brand-sep">────────────────</div>
+    <div class="brand-user">
+      ${esc(currentUser.email)}<br>
+      <a id="sign-out-link" href="#">Sign out</a>
+    </div>
+    <div class="brand-fill"></div>
   `;
-  nav.querySelector('#sign-out-btn').addEventListener('click', async () => {
+
+  // Sign out
+  brand.querySelector('#sign-out-link').addEventListener('click', async (e) => {
+    e.preventDefault();
     await signOut();
     window.location.hash = '#/';
   });
+
+  // Live clock
+  if (clockInterval) clearInterval(clockInterval);
+  clockInterval = setInterval(() => {
+    const n = new Date();
+    const dateEl = document.getElementById('brand-date');
+    const timeEl = document.getElementById('brand-time');
+    if (dateEl) dateEl.textContent = n.toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    if (timeEl) timeEl.textContent = n.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }, 1000);
+
+  // Fill character
+  const fill = brand.querySelector('.brand-fill');
+  if (fill) {
+    let chars = '';
+    for (let i = 0; i < 500; i++) chars += '\u2591';
+    fill.textContent = chars;
+  }
 }
 
 // -- Init --
@@ -138,7 +179,6 @@ window.addEventListener('hashchange', () => {
   if (currentUser) route();
 });
 
-// Initial load
 (async () => {
   currentUser = await getUser();
   route();

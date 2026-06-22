@@ -33,10 +33,10 @@ export async function renderContactDetail(container, id) {
       : 'Last contact: never';
     const lastContactCss = lastLog ? getTemperature(lastLog.logged_at).css : 'temp-dead';
 
-    // Next step
-    const nextStepLog = (logs || []).find(l => l.content?.startsWith('>'));
-    const nextStepHtml = nextStepLog
-      ? `<div class="next-step"><span class="next-step-label">NEXT:</span> ${esc(nextStepLog.content.slice(1).trim())} <span class="muted">${formatDate(nextStepLog.logged_at)}</span></div>`
+    // Next step — only if the most recent log starts with >
+    const firstLog = (logs || [])[0];
+    const nextStepHtml = firstLog?.content?.startsWith('>')
+      ? `<div class="next-step"><span class="next-step-label">NEXT:</span> ${esc(firstLog.content.slice(1).trim())} <span class="muted">${formatDate(firstLog.logged_at)}</span></div>`
       : '';
 
     // Related projects (where this contact is assigned)

@@ -12,6 +12,7 @@ export async function renderQuickEntry(container, context = {}) {
     const today = new Date().toISOString().slice(0, 10);
 
     container.innerHTML = `
+      <div class="qe-separator">${'─'.repeat(200)}</div>
       <div class="quick-entry">
         <input type="text" id="qe-content" class="input qe-input" placeholder="What happened? Start with > for next step">
         <select id="qe-contact" class="input qe-select">

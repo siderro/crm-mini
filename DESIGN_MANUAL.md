@@ -10,6 +10,7 @@ Design system for web applications at Svejda-Goldmann. Inspired by DOS/NetWare t
 - One font, one size, everywhere. No visual hierarchy through font size — use color instead.
 - Fill the space. Empty areas get character fill (░), not whitespace.
 - If it could run on a 386, it's correct.
+- Everything must be selectable text. No images, no SVGs, no canvas. Logos are built from block characters (▓░) rendered as real DOM text nodes.
 
 ---
 
