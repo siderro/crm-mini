@@ -27,10 +27,12 @@ export async function renderProjectDetail(container, id) {
       return;
     }
 
-    // Next step — only if the most recent log starts with >
+    // Next step / waiting — based on most recent log prefix
     const firstLog = (logs || [])[0];
     const nextStepHtml = firstLog?.content?.startsWith('>')
       ? `<div class="next-step"><span class="next-step-label">NEXT:</span> ${esc(firstLog.content.slice(1).trim())} <span class="muted">${formatDate(firstLog.logged_at)}</span></div>`
+      : firstLog?.content?.startsWith('?')
+      ? `<div class="next-step waiting-step"><span class="waiting-step-label">WAITING:</span> ${esc(firstLog.content.slice(1).trim())} <span class="muted">${formatDate(firstLog.logged_at)}</span></div>`
       : '';
 
     const logTimelineHtml = renderLogTimeline(logs || [], 'project', { contacts: contacts || [] });

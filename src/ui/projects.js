@@ -166,6 +166,23 @@ export async function renderProjects(container) {
       });
     });
 
+    // Toggle closed projects
+    const toggleLink = container.querySelector('#toggle-closed');
+    if (toggleLink) {
+      toggleLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        const closedDiv = container.querySelector('#closed-projects');
+        if (closedDiv.style.display === 'none') {
+          closedDiv.style.display = '';
+          toggleLink.textContent = 'Hide closed';
+        } else {
+          closedDiv.style.display = 'none';
+          const closedCount = closedDiv.querySelectorAll('.clickable-row').length;
+          toggleLink.textContent = `Show closed (${closedCount})`;
+        }
+      });
+    }
+
   } catch (err) {
     container.innerHTML = `<div class="error">Error: ${esc(err.message)}</div>`;
   }
@@ -187,31 +204,50 @@ function groupProjectsByStatus(projects) {
 }
 
 function renderGroupedProjects(groupedProjects, allProjects, lastLogMap) {
-  return Object.values(groupedProjects).map(group => {
-    if (group.projects.length === 0) return '';
+  const closedKeys = ['won', 'lost'];
+  const openGroups = Object.values(groupedProjects).filter(g => !closedKeys.includes(g.key));
+  const closedGroups = Object.values(groupedProjects).filter(g => closedKeys.includes(g.key));
+  const closedCount = closedGroups.reduce((s, g) => s + g.projects.length, 0);
 
-    return `
-      <div class="project-group">
-        <h2 class="group-heading">${group.title} <span class="badge">${group.projects.length}</span></h2>
-        <div class="table-wrap">
-          <table class="data-table table-projects">
-            <thead>
-              <tr>
-                <th>Project</th>
-                <th>Value</th>
-                <th>Contact</th>
-                <th>Temp</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${group.projects.map(d => renderProjectRow(d, lastLogMap)).join('')}
-            </tbody>
-          </table>
-        </div>
+  let html = openGroups.map(group => renderProjectGroup(group, lastLogMap)).join('');
+
+  if (closedCount > 0) {
+    html += `
+      <div class="closed-toggle">
+        <a href="#" id="toggle-closed" class="muted">Show closed (${closedCount})</a>
+      </div>
+      <div id="closed-projects" style="display:none">
+        ${closedGroups.map(group => renderProjectGroup(group, lastLogMap)).join('')}
       </div>
     `;
-  }).join('');
+  }
+
+  return html;
+}
+
+function renderProjectGroup(group, lastLogMap) {
+  if (group.projects.length === 0) return '';
+  return `
+    <div class="project-group">
+      <h2 class="group-heading">${group.title} <span class="badge">${group.projects.length}</span></h2>
+      <div class="table-wrap">
+        <table class="data-table table-projects">
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Value</th>
+              <th>Contact</th>
+              <th>Temp</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${group.projects.map(d => renderProjectRow(d, lastLogMap)).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
 }
 
 function renderProjectRow(d, lastLogMap) {

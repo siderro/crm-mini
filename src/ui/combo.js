@@ -56,7 +56,7 @@ export async function renderCombo(container) {
           </div>
           <div class="form-group">
             <label for="c-log">First log entry</label>
-            <textarea id="c-log" class="input" rows="2" placeholder="What happened? Start with > for next step"></textarea>
+            <textarea id="c-log" class="input" rows="2" placeholder="What happened? > next step, ? waiting on them"></textarea>
           </div>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary" id="combo-submit">Save</button>

@@ -23,8 +23,10 @@ export function renderLogTimeline(logs, context = 'contact', options = {}) {
     }
 
     const isNext = log.content?.startsWith('>');
+    const isWaiting = log.content?.startsWith('?');
+    const entryCls = isNext ? ' log-entry-next' : isWaiting ? ' log-entry-waiting' : '';
     return `
-      <div class="log-entry${isNext ? ' log-entry-next' : ''}" data-log-id="${log.id}">
+      <div class="log-entry${entryCls}" data-log-id="${log.id}">
         <div class="log-entry-view">
           <span class="log-date">${date} ───</span>
           <span class="log-content">${esc(log.content)}</span>${tag}
@@ -35,7 +37,7 @@ export function renderLogTimeline(logs, context = 'contact', options = {}) {
         </div>
         <div class="log-entry-edit" style="display:none" data-log-id="${log.id}">
           <input type="date" class="input log-edit-date" value="${log.logged_at || ''}">
-          <textarea class="input log-edit-content" rows="2">${esc(log.content || '')}</textarea>
+          <textarea class="input log-edit-content" rows="4">${esc(log.content || '')}</textarea>
           <div class="log-edit-row">
             ${context === 'contact' ? `
               <select class="input log-edit-project">

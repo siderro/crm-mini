@@ -29,7 +29,8 @@
       "Bash(npm run *)",
       "Bash(npx vite *)",
       "Bash(grep *)",
-      "Skill(keybindings-help)"
+      "Skill(keybindings-help)",
+      "Bash(kill 23593 23629 23680)"
     ]
   }
 }

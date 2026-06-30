@@ -1,4 +1,5 @@
 import { sb, getUser, onAuthChange, signOut } from './supabase.js';
+import { getLogo } from './logo.js';
 import { renderLogin } from './ui/auth.js';
 import { renderContacts } from './ui/contacts.js';
 import { renderContactDetail } from './ui/contactDetail.js';
@@ -93,7 +94,7 @@ async function renderBrand() {
     const { data: openProjects } = await sb.from('projects').select('amount').in('status', ['open']);
     const total = (openProjects || []).reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
     const totalK = Math.round(total / 1000);
-    if (totalK > 0) projectsSumText = ` ${totalK}K`;
+    if (totalK > 0) projectsSumText = `${totalK} $`;
   } catch (e) {}
 
   const now = new Date();
@@ -101,24 +102,17 @@ async function renderBrand() {
   const timeStr = now.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const dayStr = now.toLocaleDateString('en-US', { weekday: 'long' });
 
-  const logo = `<span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593</span><span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593</span>
-<span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593\u2593\u2593\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593</span>
-<span class="black">\u2593\u2593</span><span class="dgray">\u2593\u2593</span><span class="white">\u2593\u2593</span><span class="dgray">\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593</span>
-<span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593\u2593\u2593\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593</span>
-<span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593\u2593\u2593\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593</span>
-<span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593</span>
-<span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593</span><span class="black">\u2593\u2593</span>
-<span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593</span><span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593</span><span class="brown">\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593</span>
-<span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593</span><span class="black">\u2593\u2593</span><span class="brown">\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593</span><span class="brown">\u2593\u2593</span><span class="black">\u2593\u2593\u2593\u2593</span>`;
+  const logo = getLogo();
 
-  function navLink(href, label) {
-    const active = hash.startsWith(href) || (href === '#/' && (hash === '#/' || hash === ''));
-    return `<a href="${href}" class="${active ? 'active' : ''}">${label}</a>`;
+  function navLink(href, label, metric) {
+    const active = href === '#/' ? (hash === '#/' || hash === '') : hash.startsWith(href);
+    const metricHtml = metric ? ` <span class="nav-metric${active ? ' nav-metric-active' : ''}">(${metric})</span>` : '';
+    return `<a href="${href}" class="${active ? 'active' : ''}"><span class="nav-label">${label}</span>${metricHtml}</a>`;
   }
 
   brand.innerHTML = `
     <div class="brand-logo">${logo}</div>
-    <div class="brand-name">BREVIS</div>
+    <div class="brand-name">CRM Brevis</div>
     <div class="brand-time">
       <div id="brand-date">${dateStr}</div>
       <div id="brand-time">${timeStr}</div>
@@ -127,7 +121,7 @@ async function renderBrand() {
     <div class="brand-sep">────────────────</div>
     <div class="brand-nav">
       ${navLink('#/', 'Dashboard')}
-      ${navLink('#/projects', 'Projects' + projectsSumText)}
+      ${navLink('#/projects', 'Projects', projectsSumText)}
       ${navLink('#/contacts', 'Contacts')}
       ${navLink('#/companies', 'Companies')}
       ${navLink('#/heroes', 'Heroes')}
