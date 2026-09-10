@@ -30,7 +30,30 @@
       "Bash(npx vite *)",
       "Bash(grep *)",
       "Skill(keybindings-help)",
-      "Bash(kill 23593 23629 23680)"
+      "Bash(kill 23593 23629 23680)",
+      "Bash(cat /Users/jakubgoldmann/Library/CloudStorage/Dropbox/Skripty/crm-mini/supabase/*.sql)",
+      "Bash(find *)",
+      "Bash(curl -s http://localhost:5173/)",
+      "Bash(curl -s http://localhost:5179/src/app.js)",
+      "Bash(curl -s http://localhost:5179/src/modules/crm/index.js)",
+      "Bash(curl -s http://localhost:5179/src/modules/home/index.js)",
+      "Skill(update-config)",
+      "Bash(xargs -I{} sh -c 'echo \"{}: $\\(grep -c \"style=\" \"{}\"\\)\"')",
+      "Bash(xargs -I{} sh -c 'echo \"{}: $\\(grep -coE \"#[0-9A-Fa-f]{3,6}\" \"{}\"\\)\"')"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pgrep -f 'vite.*crm-mini' > /dev/null || (cd /Users/jakubgoldmann/Library/CloudStorage/Dropbox/Skripty/crm-mini && npx vite --open &)",
+            "timeout": 5,
+            "statusMessage": "Starting dev server..."
+          }
+        ]
+      }
     ]
   }
 }

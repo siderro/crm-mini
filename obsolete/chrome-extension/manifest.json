@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Brevis Home",
+  "version": "1.0.0",
+  "description": "Personal dashboard — replaces new tab with Brevis rozcestník",
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+  "permissions": [],
+  "icons": {
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}

@@ -1,186 +1,168 @@
-import { sb, getUser, onAuthChange, signOut } from './supabase.js';
-import { getLogo } from './logo.js';
-import { renderLogin } from './ui/auth.js';
-import { renderContacts } from './ui/contacts.js';
-import { renderContactDetail } from './ui/contactDetail.js';
-import { renderContactForm } from './ui/contactForm.js';
-import { renderCompanies } from './ui/companies.js';
-import { renderCompanyDetail } from './ui/companyDetail.js';
-import { renderCompanyForm } from './ui/companyForm.js';
-import { renderProjects } from './ui/projects.js';
-import { renderProjectDetail } from './ui/projectDetail.js';
-import { renderProjectForm } from './ui/projectForm.js';
-import { renderDashboard } from './ui/dashboard.js';
-import { renderExtra } from './ui/extra.js';
-import { renderCombo } from './ui/combo.js';
-import { renderHeroes } from './ui/heroes.js';
-import { renderQuickEntry } from './ui/quickEntry.js';
+import { onAuthChange, signOut } from './supabase.js';
+import { esc } from './util.js';
+import { renderLogin } from './login.js';
+import { renderHome, renderSettings } from './modules/home.js';
+import { renderWaiting } from './modules/waiting.js';
+import { renderDenied } from './modules/denied.js';
+import { MODULES, MODULE_BY_ID } from './modules/registry.js';
+import { people } from './modules/people/index.js';
+import { buildSession, canAccess, canEdit } from './session.js';
 
-const app = document.getElementById('app');
-const brand = document.getElementById('brand');
-const quickEntryEl = document.getElementById('quick-entry');
-let currentUser = null;
-let clockInterval = null;
+let session = null;
+let deniedEmail = null;   // přežije odhlášení, aby šlo vysvětlit, proč to skončilo
+const root = document.getElementById('root');
 
-// -- Router --
+// ── Routing ──
 
 function parseHash() {
-  const hash = window.location.hash.replace(/^#\/?/, '') || '';
-  return hash.split('/').filter(Boolean);
+  const raw = location.hash.replace(/^#\/?/, '');   // "crm/contacts/123"
+  return raw ? raw.split('/').filter(Boolean) : [];
 }
 
-async function route() {
-  if (!currentUser) {
-    brand.style.display = 'none';
-    quickEntryEl.style.display = 'none';
-    renderLogin(app);
+/** Všechny moduly, na které tenhle člověk dosáhne. Pořadí = pořadí registru. */
+function myModules() {
+  const mods = MODULES.filter((m) => canAccess(session, m.id));
+  if (session.isSuperadmin) mods.push(people);
+  return mods;
+}
+
+/** Do horní navigace a na hub patří jen pracovní moduly. */
+function navModules() {
+  return myModules().filter((m) => !m.settings);
+}
+
+/** Zbytek — správa, ne každodenní práce — bydlí pod Nastavením. */
+function settingsModules() {
+  return myModules().filter((m) => m.settings);
+}
+
+function route() {
+  if (!session) { renderLogin(root); return; }
+  if (session.state === 'waiting') { renderWaiting(root, session, doSignOut); return; }
+
+  const segments = parseHash();
+  const moduleId = segments[0] || 'home';
+
+  renderShell(moduleId);
+  const view = document.getElementById('view');
+
+  if (moduleId === 'home') {
+    renderHome(view, navModules());
     return;
   }
-  brand.style.display = '';
-  quickEntryEl.style.display = '';
-  await renderBrand();
 
-  const parts = parseHash();
-
-  if (parts[0] === 'contacts' && parts[1] === 'new') {
-    await renderContactForm(app);
-  } else if (parts[0] === 'contacts' && parts[1] && parts[2] === 'edit') {
-    await renderContactForm(app, parts[1]);
-  } else if (parts[0] === 'contacts' && parts[1]) {
-    await renderContactDetail(app, parts[1]);
-  } else if (parts[0] === 'companies' && parts[1] === 'new') {
-    await renderCompanyForm(app);
-  } else if (parts[0] === 'companies' && parts[1] && parts[2] === 'edit') {
-    window.location.hash = `#/companies/${parts[1]}`;
-  } else if (parts[0] === 'companies' && parts[1]) {
-    await renderCompanyDetail(app, parts[1]);
-  } else if (parts[0] === 'companies') {
-    await renderCompanies(app);
-  } else if (parts[0] === 'projects' && parts[1] === 'new') {
-    await renderProjectForm(app);
-  } else if (parts[0] === 'projects' && parts[1] && parts[2] === 'edit') {
-    await renderProjectForm(app, parts[1]);
-  } else if (parts[0] === 'projects' && parts[1]) {
-    await renderProjectDetail(app, parts[1]);
-  } else if (parts[0] === 'projects') {
-    await renderProjects(app);
-  } else if (parts[0] === 'contacts') {
-    await renderContacts(app);
-  } else if (parts[0] === 'combo') {
-    await renderCombo(app);
-  } else if (parts[0] === 'heroes') {
-    await renderHeroes(app);
-  } else if (parts[0] === 'extra') {
-    await renderExtra(app);
-  } else {
-    await renderDashboard(app);
+  if (moduleId === 'settings') {
+    renderSettings(view, settingsModules());
+    return;
   }
 
-  // Quick entry with context
-  const qeContext = {};
-  if (parts[0] === 'contacts' && parts[1] && parts[1] !== 'new' && parts[2] !== 'edit') {
-    qeContext.contactId = parts[1];
-  } else if (parts[0] === 'projects' && parts[1] && parts[1] !== 'new' && parts[2] !== 'edit') {
-    qeContext.projectId = parts[1];
+  const mod = moduleId === 'people' ? people : MODULE_BY_ID[moduleId];
+  if (!mod) {
+    view.innerHTML = `<div class="empty-state">Neznámý modul: ${esc(moduleId)}. <a href="#/">Zpět na hub</a></div>`;
+    return;
   }
-  renderQuickEntry(quickEntryEl, qeContext);
+
+  // Zamčeno se musí zamknout, ne jen schovat odkaz — zadání hashe rukou sem taky patří.
+  if (!canAccess(session, mod.id)) {
+    view.innerHTML = `<div class="empty-state">Do modulu „${esc(mod.label)}" nemáš přístup. <a href="#/">Zpět na hub</a></div>`;
+    return;
+  }
+
+  // Modul dostane kontext, ne celou session — ať se práva řeší na jednom místě.
+  mod.render(view, segments.slice(1), { email: session.email, canEdit: canEdit(session, mod.id) });
 }
 
-async function renderBrand() {
-  const hash = window.location.hash || '#/';
+// ── Shell (persistent header + content mount) ──
 
-  let projectsSumText = '';
-  try {
-    const { data: openProjects } = await sb.from('projects').select('amount').in('status', ['open']);
-    const total = (openProjects || []).reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
-    const totalK = Math.round(total / 1000);
-    if (totalK > 0) projectsSumText = `${totalK} $`;
-  } catch (e) {}
+function renderShell(activeModuleId) {
+  const nav = navModules().map((m) =>
+    `<a href="#/${m.id}" class="topnav-link${m.id === activeModuleId ? ' active' : ''}">${esc(m.label)}</a>`
+  ).join('');
 
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  const timeStr = now.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const dayStr = now.toLocaleDateString('en-US', { weekday: 'long' });
+  // „Nastavení" svítí i když jsem uvnitř některého z jeho modulů.
+  const settings = settingsModules();
+  const inSettings = activeModuleId === 'settings' || settings.some((m) => m.id === activeModuleId);
+  const settingsLink = settings.length
+    ? `<a href="#/settings" class="topnav-link${inSettings ? ' active' : ''}">Nastavení</a>`
+    : '';
 
-  const logo = getLogo();
-
-  function navLink(href, label, metric) {
-    const active = href === '#/' ? (hash === '#/' || hash === '') : hash.startsWith(href);
-    const metricHtml = metric ? ` <span class="nav-metric${active ? ' nav-metric-active' : ''}">(${metric})</span>` : '';
-    return `<a href="${href}" class="${active ? 'active' : ''}"><span class="nav-label">${label}</span>${metricHtml}</a>`;
-  }
-
-  brand.innerHTML = `
-    <div class="brand-logo">${logo}</div>
-    <div class="brand-name">CRM Brevis</div>
-    <div class="brand-time">
-      <div id="brand-date">${dateStr}</div>
-      <div id="brand-time">${timeStr}</div>
-      <div>${dayStr}</div>
-    </div>
-    <div class="brand-sep">────────────────</div>
-    <div class="brand-nav">
-      ${navLink('#/', 'Dashboard')}
-      ${navLink('#/projects', 'Projects', projectsSumText)}
-      ${navLink('#/contacts', 'Contacts')}
-      ${navLink('#/companies', 'Companies')}
-      ${navLink('#/heroes', 'Heroes')}
-      ${navLink('#/combo', '+ Combo')}
-      ${navLink('#/extra', 'Extra')}
-    </div>
-    <div class="brand-sep">────────────────</div>
-    <div class="brand-user">
-      ${esc(currentUser.email)}<br>
-      <a id="sign-out-link" href="#">Sign out</a>
-    </div>
-    <div class="brand-fill"></div>
+  root.innerHTML = `
+    <header class="topbar">
+      <a href="#/" class="brand">Brevis</a>
+      <nav class="topnav">${nav}</nav>
+      <div class="topbar-user">
+        ${settingsLink}
+        <span class="muted">${esc(session.email)}</span>
+        <a href="#" id="sign-out">Odhlásit</a>
+      </div>
+    </header>
+    <main id="view" class="view"></main>
   `;
 
-  // Sign out
-  brand.querySelector('#sign-out-link').addEventListener('click', async (e) => {
+  root.querySelector('#sign-out').addEventListener('click', (e) => {
     e.preventDefault();
-    await signOut();
-    window.location.hash = '#/';
+    doSignOut();
   });
+}
 
-  // Live clock
-  if (clockInterval) clearInterval(clockInterval);
-  clockInterval = setInterval(() => {
-    const n = new Date();
-    const dateEl = document.getElementById('brand-date');
-    const timeEl = document.getElementById('brand-time');
-    if (dateEl) dateEl.textContent = n.toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    if (timeEl) timeEl.textContent = n.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  }, 1000);
-
-  // Fill character
-  const fill = brand.querySelector('.brand-fill');
-  if (fill) {
-    let chars = '';
-    for (let i = 0; i < 500; i++) chars += '\u2591';
-    fill.textContent = chars;
+async function doSignOut() {
+  // Session zahodíme hned, aby změna hashe pod námi nestihla překreslit starý stav.
+  session = null;
+  try {
+    await signOut();
+  } finally {
+    location.hash = '#/';
   }
 }
 
-// -- Init --
+// ── Auth gate ──
 
-onAuthChange((user) => {
-  currentUser = user;
+async function handleUser(user) {
+  if (!user) {
+    session = null;
+    if (deniedEmail) {
+      const email = deniedEmail;
+      deniedEmail = null;
+      renderDenied(root, email);
+      return;
+    }
+    renderLogin(root);
+    return;
+  }
+
+  let next;
+  try {
+    next = await buildSession(user);
+  } catch (err) {
+    // Bez databáze nevíme, kam člověk smí — pustit ho dovnitř by bylo horší.
+    session = null;
+    root.innerHTML = `<div class="login"><div class="login-card gate-card">
+      <h1>Nejde se připojit</h1>
+      <p>${esc(err.message)}</p>
+      <button class="btn" onclick="location.reload()">Zkusit znovu</button>
+    </div></div>`;
+    return;
+  }
+
+  if (next.state === 'denied') {
+    // Účet mimo doménu dovnitř nepustíme ani na okamžik: nejdřív vysvětlení,
+    // pak odhlášení na pozadí. `deniedEmail` drží zprávu i přes handleUser(null),
+    // který odhlášení spustí — a nezůstane viset, kdyby signOut() selhal.
+    session = null;
+    deniedEmail = next.email;
+    renderDenied(root, next.email);
+    try { await signOut(); } catch { /* i tak je dovnitř nepustíme */ }
+    return;
+  }
+
+  session = next;
   route();
-});
-
-window.addEventListener('hashchange', () => {
-  if (currentUser) route();
-});
-
-(async () => {
-  currentUser = await getUser();
-  route();
-})();
-
-function esc(s) {
-  if (!s) return '';
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
 }
+
+// ── Init ──
+
+root.innerHTML = `<div class="login"><div class="login-card"><div class="loading">Načítám…</div></div></div>`;
+
+// Callback z onAuthStateChange se nemá blokovat vlastní async prací — odložíme ji.
+onAuthChange((user) => { setTimeout(() => handleUser(user), 0); });
+window.addEventListener('hashchange', () => { if (session) route(); });

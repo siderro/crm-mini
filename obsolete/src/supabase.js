@@ -1,27 +1,18 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 
-// Supabase UMD client is loaded from CDN in index.html.
+// Load Supabase client from CDN (already loaded in index.html)
 const { createClient } = supabase;
 
 export const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/**
- * Supabase vrací chybu v odpovědi, ne výjimkou. Storey ale mají chybu vyhodit,
- * aby ji UI mohlo ukázat místo toho, aby tiše zobrazilo prázdno.
- *
- *   const rows = unwrap(await sb.from('t').select('*'));
- */
-export function unwrap({ data, error }) {
-  if (error) throw new Error(error.message);
-  return data;
-}
-
-// ── Auth ──
+// ── Auth helpers ──
 
 export async function signInWithGoogle() {
   const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.origin + window.location.pathname },
+    options: {
+      redirectTo: window.location.origin + window.location.pathname,
+    },
   });
   if (error) throw error;
 }
@@ -37,5 +28,7 @@ export async function getUser() {
 }
 
 export function onAuthChange(callback) {
-  return sb.auth.onAuthStateChange((_event, session) => callback(session?.user ?? null));
+  return sb.auth.onAuthStateChange((_event, session) => {
+    callback(session?.user ?? null);
+  });
 }
