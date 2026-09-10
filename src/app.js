@@ -90,6 +90,7 @@ function renderShell(activeModuleId) {
     <header class="topbar">
       <a href="#/" class="brand">Brevis</a>
       <nav class="topnav">${nav}</nav>
+      ${activeModuleId === 'home' ? '' : `<div id="topbar-mini"></div>`}
       <div class="topbar-user">
         ${settingsLink}
         <span class="muted">${esc(session.email)}</span>
@@ -98,6 +99,13 @@ function renderShell(activeModuleId) {
     </header>
     <main id="view" class="view"></main>
   `;
+
+  // Modul může do hlavičky vložit připomínku (běžící stopky). Na hubu ne —
+  // tam je celá dlaždice a připomínat by se nemělo co.
+  const mini = root.querySelector('#topbar-mini');
+  if (mini) {
+    for (const m of myModules()) if (m.renderMini) m.renderMini(mini);
+  }
 
   root.querySelector('#sign-out').addEventListener('click', (e) => {
     e.preventDefault();
@@ -129,6 +137,12 @@ async function handleUser(user) {
     renderLogin(root);
     return;
   }
+
+  // Supabase hlásí změnu autentizace i při pouhém návratu na záložku — ověří si
+  // session a obnoví token. Kdyby se na to překreslovalo, přišel bys o všechno
+  // rozepsané pokaždé, co přepneš do jiného tabu a zpátky. Když je přihlášený
+  // pořád tentýž člověk, není co dělat.
+  if (session && session.email === (user.email || '').trim().toLowerCase()) return;
 
   let next;
   try {

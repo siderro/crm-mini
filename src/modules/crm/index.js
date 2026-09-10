@@ -4,7 +4,7 @@
 // Řádek je jen ke čtení; kliknutím se pod ním rozbalí panel s poli, notes
 // a tlačítkem Uložit změny. Stavová tlačítka se aplikují hned.
 
-import { esc, formatDate, formatMoney } from '../../util.js';
+import { esc, formatDate, formatMoney, formatMoneyShort } from '../../util.js';
 import {
   getOpps, createOpp, updateOpp, setStatus, deleteOpp, CLOSED, STATUS_LABEL,
 } from './store.js';
@@ -13,6 +13,7 @@ export const crm = {
   id: 'crm',
   label: 'CRM',
   desc: 'Příležitosti (OPP)',
+  tileInfo,                // na hubu: hodnota otevřené pipeline
   render(mount, subPath = []) {
     const archive = subPath[0] === 'archiv';
 
@@ -41,6 +42,15 @@ export const crm = {
     load(mount, archive);
   },
 };
+
+/** Dlaždice na hubu: kolik peněz je v otevřených příležitostech. */
+async function tileInfo() {
+  const open = (await getOpps()).filter((o) => o.status === 'open');
+  if (!open.length) return null;
+
+  const total = open.reduce((sum, o) => sum + (Number(o.est_value) || 0), 0);
+  return { badge: formatMoneyShort(total) };
+}
 
 async function load(mount, archive, { openId = null } = {}) {
   const body = mount.querySelector('#opp-body');

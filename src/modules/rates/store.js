@@ -119,11 +119,20 @@ export async function rateInfoAt(email, date) {
  * by z každého řádku byl jeden síťový dotaz.
  */
 export async function rateResolver(emails = null) {
+  const recordOn = await rateRecordResolver(emails);
+  return (email, date) => hourlyOf(recordOn(email, date));
+}
+
+/**
+ * Totéž, ale vrací celý záznam sazby — pro toho, koho zajímá i typ
+ * (hodinová × paušál), ne jen výsledné číslo. Používá to modul Výplaty.
+ */
+export async function rateRecordResolver(emails = null) {
   let query = sb.from(TABLE).select('*').order('valid_from', { ascending: false });
   if (emails?.length) query = query.in('email', [...new Set(emails)]);
   const rows = unwrap(await query);
 
-  return (email, date) => hourlyOf(pick(rows, email, date || today()));
+  return (email, date) => pick(rows, email, date || today());
 }
 
 /** Zkontroluje a dopočítá pole podle typu. Null = nesmysl, neukládat. */

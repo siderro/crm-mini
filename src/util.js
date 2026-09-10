@@ -19,6 +19,21 @@ export function formatDate(value) {
   return d.toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+/**
+ * Zkrácené peníze do těsných míst: "8 500 Kč", "300k Kč", "1,2M Kč".
+ * Pod deset tisíc se nezkracuje — tam by se ztratila přesnost, kterou čekáš.
+ */
+export function formatMoneyShort(value) {
+  if (value == null || value === '') return '';
+  const n = Number(value);
+  if (Number.isNaN(n)) return '';
+
+  const abs = Math.abs(n);
+  if (abs < 10000) return formatMoney(Math.round(n));
+  if (abs < 1000000) return `${Math.round(n / 1000)}k Kč`;
+  return `${(Math.round(n / 100000) / 10).toLocaleString('cs-CZ')}M Kč`;
+}
+
 /** ISO timestamp as "09.09.2026 14:32". Empty string if falsy. */
 export function formatDateTime(value) {
   if (!value) return '';

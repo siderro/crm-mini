@@ -11,6 +11,7 @@ export const todo = {
   id: 'todo',
   label: 'To-Do',
   desc: 'Úkoly a připomínky',
+  tileInfo,                // na hubu: počet tiketů a co čeká vlevo
   render(mount, subPath = [], ctx = {}) {
     const archive = subPath[0] === 'archiv';
     const email = ctx.email || '';
@@ -30,6 +31,20 @@ export const todo = {
     else renderWork(view, email);
   },
 };
+
+/** Dlaždice na hubu: kolik je rozpracovaných tiketů a co čeká vlevo. */
+async function tileInfo() {
+  const [tickets, raw] = await Promise.all([getItems('ticket'), getItems('raw')]);
+  if (!tickets.length && !raw.length) return null;
+
+  return {
+    badge: String(tickets.length),
+    alert: raw.length
+      ? { text: `${raw.length} ${raw.length === 1 ? 'odložená čeká'
+          : (raw.length < 5 ? 'odložené čekají' : 'odložených čeká')}`, tone: 'muted' }
+      : null,
+  };
+}
 
 // ── Pracovní stránka ──
 

@@ -1,7 +1,11 @@
 // Pracovní výkaz.
 //
-// Route: #/timesheet        — zadat výkaz
-//        #/timesheet/vypis  — moje výkazy, filtrované podle období
+// Route: #/timesheet        — můj výkaz, filtrovaný podle období
+//        #/timesheet/rucne  — zápis rukou, když se zapomnělo trackovat
+//
+// Stopky se ovládají z dlaždice na hubu (viz renderTile níž). Po jejich
+// zastavení čeká naměřený čas na doplnění projektu — panel na to se ukáže
+// nahoře v Mém výkazu, kam Stop z dlaždice odkáže.
 //
 // Vykazuje se jen do projektů, kde má člověk úroveň 'report' (nastavuje se
 // v modulu Projekty nebo v Nastavení). Výkaz patří tomu, kdo ho zapsal —
@@ -11,30 +15,248 @@ import { esc, formatDate, formatMoney } from '../../util.js';
 import { getProjects, projectsFor } from '../projects/store.js';
 import { rateResolver } from '../rates/store.js';
 import { getEntries, addEntry, updateEntry, deleteEntry, KINDS, KIND_LABEL, KIND_SHORT } from './store.js';
+import {
+  readTracker, startTracker, pauseTracker, resumeTracker, stopTracker, clearTracker,
+  elapsedMs, formatDuration, toHours, trackedDay,
+} from './tracker.js';
 
 export const timesheet = {
   id: 'timesheet',
   label: 'Pracovní výkaz',
   desc: 'Odpracovaný čas',
+  renderTile,              // stopky jdou ovládat rovnou z dlaždice na hubu
+  renderMini,              // a připomínají se v hlavičce, když někde jinde běží
   render(mount, subPath = [], ctx = {}) {
-    const list = subPath[0] === 'vypis';
+    const page = subPath[0] || 'mine';
     const email = ctx.email || '';
+
+    const tab = (id, href, label) =>
+      `<a href="${href}" class="subnav-link${page === id ? ' active' : ''}">${label}</a>`;
 
     mount.innerHTML = `
       <div class="ts">
         <div class="page-head"><h1>Pracovní výkaz</h1></div>
         <nav class="subnav">
-          <a href="#/timesheet" class="subnav-link${list ? '' : ' active'}">Zadat výkaz</a>
-          <a href="#/timesheet/vypis" class="subnav-link${list ? ' active' : ''}">Výpis</a>
+          ${tab('mine', '#/timesheet', 'Můj výkaz')}
+          ${tab('rucne', '#/timesheet/rucne', 'Zadat ručně')}
         </nav>
         <div id="ts-view"><div class="loading">Načítám…</div></div>
       </div>`;
 
     const view = mount.querySelector('#ts-view');
-    if (list) renderList(view, email);
-    else renderForm(view, email);
+    if (page === 'rucne') renderForm(view, email);
+    else renderMine(view, email);
   },
 };
+
+// ── Stopky ──
+//
+// Ovládání je na dlaždici hubu; tady zůstává jen to, co se dělá s naměřeným
+// časem — doplnit projekt a popis a udělat z toho výkaz.
+
+/**
+ * Malé stopky v hlavičce — připomínka, že něco běží, když jsi jinde v systému.
+ * Když se nic neměří, nevykreslí se nic; hlavička má zůstat klidná.
+ */
+function renderMini(el) {
+  const t = readTracker();
+  if (!t) { el.innerHTML = ''; return; }
+
+  if (t.stopped) {
+    el.innerHTML = `
+      <a href="#/timesheet" class="mini" title="Naměřený čas čeká na doplnění">
+        <span class="mini-dot mini-waiting"></span>
+        <span class="mini-clock">${formatDuration(elapsedMs(t))}</span>
+        <span class="mini-label">čeká na uložení</span>
+      </a>`;
+    return;
+  }
+
+  const running = !!t.running;
+
+  el.innerHTML = `
+    <div class="mini">
+      <span class="mini-dot${running ? ' mini-live' : ''}"></span>
+      <a href="#/timesheet" class="mini-clock" title="${running ? 'Měří se' : 'Pozastaveno'}">${formatDuration(elapsedMs(t))}</a>
+      <button class="btn mini-btn" data-act="${running ? 'pause' : 'resume'}">${running ? 'Pauza' : 'Pokračovat'}</button>
+      <button class="btn mini-btn" data-act="stop">Stop</button>
+    </div>`;
+
+  if (running) {
+    const clock = el.querySelector('.mini-clock');
+    const timer = setInterval(() => {
+      // Hlavička se překresluje při každé navigaci — starý interval se uklidí sám.
+      if (!document.contains(clock)) { clearInterval(timer); return; }
+      clock.textContent = formatDuration(elapsedMs(readTracker()));
+    }, 1000);
+  }
+
+  el.querySelector('.mini').addEventListener('click', (e) => {
+    const act = e.target.dataset.act;
+    if (!act) return;
+
+    if (act === 'pause') pauseTracker();
+    else if (act === 'resume') resumeTracker();
+    else if (act === 'stop') {
+      stopTracker();
+      location.hash = '#/timesheet';
+      return;
+    }
+    renderMini(el);
+  });
+}
+
+/**
+ * Stopky na dlaždici hubu. Umí spustit, pauzu i stop; doplnit projekt a popis
+ * se chodí do modulu — na dlaždici by na to nebylo místo a bylo by to matoucí.
+ */
+function renderTile(el) {
+  const t = readTracker();
+
+  if (t?.stopped) {
+    el.innerHTML = `
+      <div class="tile-clock">${formatDuration(elapsedMs(t))}</div>
+      <div class="tile-tracker-state muted">čeká na uložení</div>
+      <div class="tile-tracker-buttons">
+        <a href="#/timesheet" class="btn btn-primary tile-btn">Doplnit a uložit</a>
+      </div>`;
+    return;
+  }
+
+  const running = !!t?.running;
+  const paused = !!t && !t.running;
+
+  el.innerHTML = `
+    <div class="tile-clock${running ? ' tr-running' : ''}">${formatDuration(elapsedMs(t))}</div>
+    <div class="tile-tracker-state muted">${running ? 'měří se' : (paused ? 'pozastaveno' : 'stopky stojí')}</div>
+    <div class="tile-tracker-buttons">
+      ${!t ? `<button class="btn btn-primary tile-btn" data-act="start">Spustit</button>` : ''}
+      ${running ? `<button class="btn tile-btn" data-act="pause">Pauza</button>` : ''}
+      ${paused ? `<button class="btn btn-primary tile-btn" data-act="resume">Pokračovat</button>` : ''}
+      ${t ? `<button class="btn tile-btn" data-act="stop">Stop</button>` : ''}
+    </div>`;
+
+  if (running) {
+    const clock = el.querySelector('.tile-clock');
+    const timer = setInterval(() => {
+      // Až dlaždice zmizí ze stránky, interval se uklidí sám.
+      if (!document.contains(clock)) { clearInterval(timer); return; }
+      clock.textContent = formatDuration(elapsedMs(readTracker()));
+    }, 1000);
+  }
+
+  el.querySelector('.tile-tracker-buttons').addEventListener('click', (e) => {
+    const act = e.target.dataset.act;
+    if (!act) return;
+
+    if (act === 'start') startTracker();
+    else if (act === 'pause') pauseTracker();
+    else if (act === 'resume') resumeTracker();
+    else if (act === 'stop') {
+      // Stop znamená „mám hotovo" — projekt a popis se doplní v modulu.
+      stopTracker();
+      location.hash = '#/timesheet';
+      return;
+    }
+    renderTile(el);
+  });
+}
+
+/**
+ * Můj výkaz. Když čeká naměřený čas z trackeru, řeší se nejdřív — proto je
+ * panel nad výpisem, ne někde bokem.
+ */
+async function renderMine(view, email) {
+  view.innerHTML = `<div id="ts-pending"></div><div id="ts-mine"></div>`;
+
+  const t = readTracker();
+  if (t?.stopped) {
+    await renderPending(view.querySelector('#ts-pending'), email, t, () => renderMine(view, email));
+  }
+  renderList(view.querySelector('#ts-mine'), email);
+}
+
+/** Zastavené stopky — naměřený čas čeká, až z něj uděláš výkaz. */
+async function renderPending(view, email, t, onDone) {
+  const projects = await projectsFor(email, { level: 'report' });
+  if (!projects.length) {
+    view.innerHTML = `<div class="error">
+      Máš naměřeno ${esc(formatDuration(elapsedMs(t)))}, ale nemáš přiřazený žádný projekt,
+      do kterého bys mohl vykazovat.
+    </div>`;
+    return;
+  }
+
+  const ms = elapsedMs(t);
+  const hours = toHours(ms);
+  const day = trackedDay(t);
+
+  view.innerHTML = `
+    <div class="tr-pending">
+      <div class="tr-pending-head">
+        <span class="tr-clock">${formatDuration(ms)}</span>
+        <span class="tr-state muted">naměřeno trackerem · uloží se jako ${esc(fmtHours(hours))} h</span>
+      </div>
+    <div class="ts-form tr-form">
+      <label class="ts-field-wide">Projekt
+        <select id="tr-project">${projectOptions(projects, projects[0].id)}</select>
+      </label>
+      <label>Typ práce
+        <select id="tr-kind">${kindOptions(kindForRole(projects[0].role))}</select>
+      </label>
+      <label class="ts-field-wide">Popis
+        <textarea class="input ts-note" id="tr-note" rows="3" placeholder="Co se dělalo…"></textarea>
+      </label>
+    </div>
+    <div class="ts-actions">
+      <button id="tr-save" class="btn btn-primary">Uložit výkaz</button>
+      <button id="tr-discard" class="btn btn-danger">Zahodit</button>
+      <span id="tr-msg" class="ts-msg"></span>
+    </div>
+    <p class="muted tr-note">Zapíše se na ${esc(formatDate(day))} — den, kdy měření začalo.</p>
+    </div>`;
+
+  const projectSelect = view.querySelector('#tr-project');
+  const kindSelect = view.querySelector('#tr-kind');
+  const msg = view.querySelector('#tr-msg');
+
+  projectSelect.addEventListener('change', () => {
+    const picked = projects.find((p) => p.id === projectSelect.value);
+    kindSelect.value = kindForRole(picked?.role);
+  });
+
+  view.querySelector('#tr-save').addEventListener('click', async () => {
+    if (hours <= 0) {
+      msg.textContent = 'Naměřený čas je moc krátký na zápis.';
+      msg.className = 'ts-msg error';
+      return;
+    }
+
+    const entry = await addEntry({
+      projectId: projectSelect.value,
+      email,
+      date: day,
+      hours,
+      kind: kindSelect.value,
+      note: view.querySelector('#tr-note').value.trim(),
+    });
+
+    if (!entry) {
+      msg.textContent = 'Uložení se nepovedlo.';
+      msg.className = 'ts-msg error';
+      return;
+    }
+
+    clearTracker();
+    onDone();
+  });
+
+  view.querySelector('#tr-discard').addEventListener('click', () => {
+    if (!confirm(`Zahodit naměřených ${formatDuration(ms)}?`)) return;
+    clearTracker();
+    onDone();
+  });
+}
 
 /** Datum jako 'YYYY-MM-DD' (lokální čas), volitelně s posunem o dny. */
 function dayString(offset = 0) {

@@ -12,6 +12,9 @@
 
 import { esc, formatDate, formatMoney } from '../../util.js';
 import { MODULES } from '../registry.js';
+
+/** Moduly, které jde někomu zapnout — ty jen pro superadmina mezi ně nepatří. */
+const GRANTABLE = MODULES.filter((m) => !m.superadminOnly);
 import { SUPERADMIN_EMAIL } from '../../config.js';
 import { listUsers, setUserModule } from '../access/store.js';
 import {
@@ -71,7 +74,7 @@ async function load(body) {
   for (const u of users) {
     const isSuperadmin = u.email === superadminEmail();
     const granted = u.modules || {};
-    const count = isSuperadmin ? MODULES.length : Object.keys(granted).length;
+    const count = isSuperadmin ? GRANTABLE.length : Object.keys(granted).length;
     const info = await rateInfoAt(u.email, day);
 
     const badge = isSuperadmin
@@ -83,7 +86,7 @@ async function load(body) {
         <td class="people-email">${esc(u.email)} ${badge}</td>
         <td class="people-date">${esc(formatDate(u.first_login))}</td>
         <td class="people-date">${esc(formatDate(u.last_login))}</td>
-        <td class="people-num">${count} z ${MODULES.length}</td>
+        <td class="people-num">${count} z ${GRANTABLE.length}</td>
         <td class="people-rate">${hourlyText(info?.hourly ?? null, info?.type)}</td>
       </tr>`);
   }
@@ -147,7 +150,7 @@ async function renderModules(el, row, body) {
   const granted = user?.modules || {};
 
   // Super admin má všechno vždycky a jeho práva neplynou z dat — proto zamčeno.
-  const rows = MODULES.map((m) => {
+  const rows = GRANTABLE.map((m) => {
     const level = isSuperadmin ? 'edit' : (granted[m.id] || '');
     const dis = isSuperadmin ? ' disabled' : '';
 

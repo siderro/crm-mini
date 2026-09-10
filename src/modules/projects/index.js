@@ -26,6 +26,7 @@ export const pm = {
   label: 'Projekty',
   desc: 'Řízení projektů',
   levels: true,          // v Přístupech se nastavuje čtení / editace
+  tileInfo,              // na hubu: počet běžících a co hoří
   render(mount, subPath = [], ctx = {}) {
     const canEdit = !!ctx.canEdit;
     const page = subPath[0] || null;
@@ -183,20 +184,49 @@ function meterCell(meter) {
   </td>`;
 }
 
-/** Buňka s cenou: hlavní je EST cena, PM a SLA drobně pod ní. */
-function priceCell(p) {
+/**
+ * Buňka s cenou: hlavní je EST cena, PM a SLA drobně pod ní.
+ * U SLA se ukazuje, kolikrát se za život projektu zaúčtuje — měsíční částka
+ * sama o sobě neřekne, kolik z projektu doopravdy přijde.
+ */
+function priceCell(p, stats) {
   if (!isBillable(p)) {
     return `<td class="pm-price"><span class="status status-frozen">${esc(BILLING_LABEL[p.billing])}</span></td>`;
   }
 
-  const extras = [];
-  if (p.est_pm) extras.push(`+ PM ${formatMoney(p.est_pm)}`);
-  if (p.est_sla) extras.push(`SLA ${formatMoney(p.est_sla)}/měs`);
+  const lines = [];
+  if (p.est_pm) lines.push(`+ PM ${formatMoney(p.est_pm)}`);
+
+  if (p.est_sla) {
+    const { months, total } = stats.sla;
+    lines.push(months
+      ? `${months}× SLA = ${formatMoney(total)}`
+      : `SLA ${formatMoney(p.est_sla)}/měs`);   // bez termínů nevíme, kolikrát
+  }
 
   return `<td class="pm-price">
     <div class="pm-price-main">${p.est_price == null ? '<span class="muted">—</span>' : esc(formatMoney(p.est_price))}</div>
-    ${extras.length ? `<div class="pm-price-extra muted">${esc(extras.join(' · '))}</div>` : ''}
+    ${lines.map((l) => `<div class="pm-price-extra muted">${esc(l)}</div>`).join('')}
   </td>`;
+}
+
+/** Dlaždice na hubu: kolik projektů běží a co z toho hoří. */
+async function tileInfo() {
+  const projects = await getProjects();
+  if (!projects.length) return null;
+
+  const stats = await statsForProjects(projects);
+  const late = projects.filter((p) => timeMeter(p).tone === 'over').length;
+  const overHours = projects.filter((p) => stats.get(p.id).design.overHours > 0).length;
+
+  const alarms = [];
+  if (late) alarms.push(`${late} po termínu`);
+  if (overHours) alarms.push(`${overHours} přes hodiny`);
+
+  return {
+    badge: String(projects.length),
+    alert: alarms.length ? { text: alarms.join(' · '), tone: 'over' } : null,
+  };
 }
 
 // ── Výpis běžících ──
@@ -245,7 +275,7 @@ async function renderList(mount, canEdit) {
         ${meterCell(timeMeter(p))}
         ${meterCell(designMeter(s))}
         ${meterCell(pmMeter(s))}
-        ${priceCell(p)}
+        ${priceCell(p, s)}
         <td class="pm-num">${teamSize[p.id] || '<span class="muted">—</span>'}</td>
       </tr>`;
   });

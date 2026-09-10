@@ -77,6 +77,45 @@ a:hover { color: var(--primary-hover); text-decoration: underline; }
 .topbar-user { display: flex; align-items: center; gap: 12px; }
 .topbar-user .topnav-link { padding: 5px 10px; }
 
+/* Malé stopky v hlavičce — připomínka, že se někde měří čas. */
+.mini {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 10px 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-alt);
+  color: var(--text);
+}
+a.mini:hover { text-decoration: none; border-color: var(--border-strong); }
+.mini-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: none;
+}
+.mini-dot.mini-live { background: var(--primary); }
+.mini-dot.mini-waiting { background: var(--warning); }
+.mini-clock {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+a.mini-clock:hover { text-decoration: none; color: var(--primary); }
+.mini-label { font-size: 12px; color: var(--text-secondary); }
+.mini-btn {
+  padding: 1px 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-secondary);
+}
+.mini-btn:hover { background: var(--surface); border-color: var(--border-strong); color: var(--text); }
+
 .view { padding: 24px; max-width: 1200px; width: 100%; margin: 0 auto; }
 
 /* ── Login ── */
@@ -111,8 +150,38 @@ a:hover { color: var(--primary-hover); text-decoration: underline; }
   padding: 16px;
   color: var(--text);
 }
-.tile:hover { border-color: var(--border-strong); background: var(--surface-alt); text-decoration: none; }
+a.tile:hover { border-color: var(--border-strong); background: var(--surface-alt); text-decoration: none; }
 .tile-label { font-weight: 600; font-size: 15px; margin-bottom: 2px; }
+
+/* Dlaždice s vlastním ovládáním — odkaz je jen hlavička, ne celá plocha. */
+.tile-live { display: flex; flex-direction: column; }
+.tile-link { display: block; color: var(--text); margin: -16px -16px 0; padding: 16px 16px 0; }
+.tile-link:hover { text-decoration: none; color: var(--text); }
+.tile-link:hover .tile-label { color: var(--primary); }
+.tile-extra { margin-top: 12px; }
+
+/* Číslo v závorce za nadpisem — tiché, ne křiklavé. */
+.tile-badge { font-weight: 400; color: var(--muted); }
+a.tile:hover .tile-badge { color: var(--text-secondary); }
+
+/* Dole jen to, co vyžaduje pozornost. Prázdné nic nezabírá. */
+.tile-alert { font-size: 12px; }
+.tile-alert:not(:empty) { margin-top: 10px; }
+.tile-alert.tone-muted { color: var(--text-secondary); }
+.tile-alert.tone-over { color: var(--danger); font-weight: 500; }
+.tile-clock {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.tile-clock.tr-running { color: var(--primary); }
+.tile-tracker-state { font-size: 12px; margin-top: 1px; }
+.tile-tracker-buttons { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.tile-btn { padding: 4px 12px; font-size: 13px; }
+a.tile-btn { display: inline-block; }
+a.tile-btn:hover { text-decoration: none; }
 
 /* ── Sub-nav (within a module) ── */
 
@@ -418,6 +487,7 @@ a:hover { color: var(--primary-hover); text-decoration: underline; }
 .pm-table th.pm-price, .pm-table td.pm-price { text-align: right; white-space: nowrap; }
 .pm-price-main { font-weight: 500; }
 .pm-price-extra { font-size: 12px; margin-top: 1px; }
+.pm-price-extra + .pm-price-extra { margin-top: 0; }
 .pm-table .pm-date { color: var(--text-secondary); white-space: nowrap; }
 .pm-table .tone-over { color: var(--danger); font-weight: 500; }
 
@@ -551,6 +621,28 @@ a:hover { color: var(--primary-hover); text-decoration: underline; }
 .ts-day-project { flex: none; min-width: 160px; }
 .ts-day-note { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 
+/* Naměřeno trackerem, čeká na doplnění — panel nad výpisem */
+.tr-pending {
+  border: 1px solid var(--primary);
+  background: var(--primary-tint);
+  border-radius: 10px;
+  padding: 14px 16px 16px;
+  margin-bottom: 24px;
+}
+.tr-pending-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.tr-clock {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.tr-state { font-size: 13px; }
+.tr-note { font-size: 12px; margin-top: 12px; }
+.tr-form { margin-top: 0; }
+.tr-pending .ts-actions { margin-top: 12px; }
+.tr-pending .input, .tr-pending select { background: var(--surface); }
+
 /* Výpis */
 .ts-filters { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
 .ts-filter.active { background: var(--primary-tint); border-color: var(--primary); color: var(--primary); }
@@ -569,6 +661,84 @@ a:hover { color: var(--primary-hover); text-decoration: underline; }
 .ts-edit { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 4px 0; }
 .ts-edit .input { padding: 4px 8px; }
 .ts-edit .ts-edit-note { flex: 1 1 200px; min-width: 0; }
+
+/* ── Příjmy výhled ── */
+
+.inc-lead { font-size: 13px; margin-bottom: 16px; max-width: 720px; }
+.inc-filters { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.inc-filter.active { background: var(--primary-tint); border-color: var(--primary); color: var(--primary); }
+.inc-sum { margin-bottom: 20px; }
+
+.inc-months {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+.inc-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px 8px;
+}
+.inc-card-empty { background: var(--surface-alt); border-style: dashed; }
+.inc-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.inc-card-month { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+.inc-card-total { font-weight: 600; white-space: nowrap; }
+.inc-card-none { font-size: 12px; padding: 2px 0; }
+
+/* SLA pod čarou — účtuje se každý měsíc, není to jednorázová faktura. */
+.inc-sla {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 5px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.inc-head { color: var(--muted); font-weight: 500; margin: 28px 0 4px; }
+.inc-note { font-size: 12px; margin-bottom: 8px; }
+.inc-list { max-width: 620px; }
+
+.inc-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 4px;
+  margin: 0 -4px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.inc-item:hover { background: var(--surface-alt); }
+.inc-list .inc-item { border-bottom: 1px solid var(--border); border-radius: 0; }
+.inc-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inc-item-date { flex: none; font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+.inc-item-amount { flex: none; white-space: nowrap; font-size: 13px; }
+.inc-item.tone-over .inc-item-date, .inc-item.tone-over .inc-item-amount { color: var(--danger); }
+
+/* ── Výplaty ── */
+
+.pay-filters { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.pay-filter.active { background: var(--primary-tint); border-color: var(--primary); color: var(--primary); }
+.pay-sum { margin-bottom: 20px; }
+
+.pay-table td { vertical-align: middle; }
+.pay-table .pay-email { white-space: nowrap; }
+.pay-table .pay-type { color: var(--text-secondary); white-space: nowrap; }
+.pay-table th.pay-num, .pay-table td.pay-num { text-align: right; white-space: nowrap; }
+.pay-table .pay-total { font-weight: 500; }
+.pay-split { font-size: 12px; font-weight: 400; margin-top: 1px; }
+.pay-note { font-size: 12px; margin-top: 12px; max-width: 620px; }
 
 /* ── Přístupy do projektů ── */
 
@@ -647,6 +817,7 @@ a:hover { color: var(--primary-hover); text-decoration: underline; }
   .topbar { gap: 12px; padding: 0 12px; }
   .view { padding: 16px 12px; }
   .topbar-user .muted { display: none; }
+  .mini-btn, .mini-label { display: none; }
   .opp-sum { gap: 16px; }
   .opp-buttons { flex-wrap: wrap; }
   .opp-buttons-gap { display: none; }

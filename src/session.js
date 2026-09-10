@@ -2,7 +2,7 @@
 // router se pak už jen ptá.
 
 import { ALLOWED_DOMAIN, SUPERADMIN_EMAIL } from './config.js';
-import { MODULES } from './modules/registry.js';
+import { MODULES, MODULE_BY_ID } from './modules/registry.js';
 import { touchUser, getUserAccess } from './modules/access/store.js';
 
 /**
@@ -28,6 +28,7 @@ export async function buildSession(user) {
     ? Object.fromEntries(MODULES.map((m) => [m.id, 'edit']))
     : await getUserAccess(email);
 
+
   const allowedModules = Object.keys(moduleAccess);
 
   return {
@@ -41,16 +42,21 @@ export async function buildSession(user) {
   };
 }
 
+/** Modul, který se nikomu nezapíná — vidí ho jen superadmin. */
+function isRestricted(moduleId) {
+  return moduleId === 'people' || !!MODULE_BY_ID[moduleId]?.superadminOnly;
+}
+
 /** Smí tenhle člověk na tenhle modul? */
 export function canAccess(session, moduleId) {
   if (!session) return false;
-  if (moduleId === 'people') return session.isSuperadmin;
+  if (isRestricted(moduleId)) return session.isSuperadmin;
   return session.allowedModules.includes(moduleId);
 }
 
 /** Smí v tom modulu i měnit data? Modul bez úrovní má u lidí vždy 'edit'. */
 export function canEdit(session, moduleId) {
   if (!session) return false;
-  if (moduleId === 'people') return session.isSuperadmin;
+  if (isRestricted(moduleId)) return session.isSuperadmin;
   return session.moduleAccess[moduleId] === 'edit';
 }
