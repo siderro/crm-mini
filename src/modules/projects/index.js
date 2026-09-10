@@ -2,8 +2,9 @@
 //
 // Route: #/pm            — běžící projekty, co projekt to řádek
 //        #/pm/novy       — založení projektu, rovnou i s lidmi
-//        #/pm/uzavrene   — uzavřené projekty a ziskovost
 //        #/pm/<id>       — detail: odhady, ekonomika, tým, výkazy
+//
+// Uzavřené projekty se vyhodnocují v modulu Ziskovost projektů.
 //
 // Odhad NENÍ jeden součet. Design se měří v hodinách (tam je zisk a tam se
 // nesmí přetéct), PM v penězích (je tak definovaný), SLA je měsíční opakovaný
@@ -32,7 +33,6 @@ export const pm = {
     const page = subPath[0] || null;
 
     if (page === 'novy') { renderCreate(mount, canEdit); return; }
-    if (page === 'uzavrene') { renderClosed(mount, canEdit); return; }
     if (page) { renderDetail(mount, page, canEdit); return; }
     renderList(mount, canEdit);
   },
@@ -53,7 +53,6 @@ function subnav(active, canEdit) {
     `<a href="${href}" class="subnav-link${id === active ? ' active' : ''}">${label}</a>`;
   return `<nav class="subnav">
     ${link('open', '#/pm', 'Běžící')}
-    ${link('closed', '#/pm/uzavrene', 'Uzavřené')}
     ${canEdit ? link('new', '#/pm/novy', 'Přidat projekt') : ''}
   </nav>`;
 }
@@ -298,122 +297,6 @@ async function renderList(mount, canEdit) {
   });
 }
 
-// ── Uzavřené projekty a ziskovost ──
-
-const CLOSED_RANGES = [
-  { id: 'year', label: 'Tento rok' },
-  { id: 'lastyear', label: 'Minulý rok' },
-  { id: 'all', label: 'Vše' },
-];
-
-/** Hranice [od, do) jako 'YYYY-MM-DD'; null = neomezeno. */
-function closedRangeBounds(id) {
-  const year = new Date().getFullYear();
-  if (id === 'year') return [`${year}-01-01`, null];
-  if (id === 'lastyear') return [`${year - 1}-01-01`, `${year}-01-01`];
-  return [null, null];
-}
-
-function inRange(value, [from, to]) {
-  const day = String(value || '').slice(0, 10);
-  return (from === null || day >= from) && (to === null || day < to);
-}
-
-function renderClosed(mount, canEdit) {
-  mount.innerHTML = `
-    <div class="pm">
-      <div class="page-head"><h1>Uzavřené projekty</h1></div>
-      ${subnav('closed', canEdit)}
-      <div class="pm-filters">
-        ${CLOSED_RANGES.map((r, i) =>
-          `<button class="btn pm-filter${i === 0 ? ' active' : ''}" data-range="${r.id}">${r.label}</button>`
-        ).join('')}
-      </div>
-      <div id="pm-closed"><div class="loading">Načítám…</div></div>
-    </div>`;
-
-  mount.querySelector('.pm-filters').addEventListener('click', (e) => {
-    const range = e.target.dataset.range;
-    if (!range) return;
-    mount.querySelectorAll('.pm-filter').forEach((b) => b.classList.toggle('active', b === e.target));
-    loadClosed(mount, range);
-  });
-
-  loadClosed(mount, 'year');
-}
-
-async function loadClosed(mount, range) {
-  const el = mount.querySelector('#pm-closed');
-  const all = await getProjects({ onlyClosed: true });
-  const projects = all.filter((p) => inRange(p.closed_at, closedRangeBounds(range)));
-
-  if (!projects.length) {
-    el.innerHTML = `<div class="empty-state">V tomhle období nic uzavřeného.</div>`;
-    return;
-  }
-
-  const allStats = await statsForProjects(projects);
-
-  let sumRevenue = 0;
-  let sumCost = 0;
-  const rows = [];
-
-  for (const p of projects) {
-    const stats = allStats.get(p.id);
-    const margin = stats.margin;
-    if (margin) {
-      sumRevenue += margin.revenue;
-      sumCost += margin.cost;
-    } else {
-      sumCost += stats.total.cost;
-    }
-
-    const loss = margin && margin.profit < 0 ? ' tone-over' : '';
-    const profitCells = margin
-      ? `<td class="pm-num${loss}">${esc(czk(margin.profit))}</td>
-         <td class="pm-num${loss}">${margin.percent == null ? '—' : esc(Math.round(margin.percent)) + ' %'}</td>`
-      : `<td class="pm-num" colspan="2"><span class="status status-frozen">${esc(BILLING_LABEL[p.billing])}</span></td>`;
-
-    rows.push(`
-      <tr class="pm-row" data-id="${esc(p.id)}">
-        <td class="pm-name">${esc(p.name)}</td>
-        <td class="pm-date">${esc(formatDate(p.closed_at))}</td>
-        <td class="pm-num">${esc(fmtHours(stats.total.hours))} h${
-          stats.design.estHours ? ` <span class="muted">/ ${esc(fmtHours(stats.design.estHours))}</span>` : ''}</td>
-        <td class="pm-num">${margin ? esc(formatMoney(margin.revenue)) : '<span class="muted">—</span>'}</td>
-        <td class="pm-num">${esc(czk(stats.total.cost))}</td>
-        ${profitCells}
-      </tr>`);
-  }
-
-  const profit = sumRevenue - sumCost;
-  const cell = (label, value, tone = '') =>
-    `<div class="pm-cell"><span class="pm-cell-label">${label}</span><span class="pm-cell-value ${tone}">${value}</span></div>`;
-
-  el.innerHTML = `
-    <div class="pm-summary pm-closed-sum">
-      ${cell('Výnos', esc(czk(sumRevenue)))}
-      ${cell('Náklad', esc(czk(sumCost)))}
-      ${cell('Zisk', `<strong>${esc(czk(profit))}</strong>`, profit < 0 ? 'tone-over' : '')}
-      ${cell('Projektů', projects.length)}
-    </div>
-    <table class="table pm-table pm-closed-table">
-      <thead>
-        <tr>
-          <th>Projekt</th><th>Uzavřeno</th><th class="pm-num">Hodiny</th>
-          <th class="pm-num">Výnos</th><th class="pm-num">Náklad</th>
-          <th class="pm-num">Zisk</th><th class="pm-num">Marže</th>
-        </tr>
-      </thead>
-      <tbody>${rows.join('')}</tbody>
-    </table>`;
-
-  el.querySelector('tbody').addEventListener('click', (e) => {
-    const row = e.target.closest('tr.pm-row');
-    if (row) location.hash = `#/pm/${row.dataset.id}`;
-  });
-}
-
 // ── Formulář (společný pro založení i úpravu) ──
 
 function formFields(p = {}) {
@@ -573,7 +456,7 @@ async function renderDetail(mount, id, canEdit) {
   const closed = project.status === 'closed';
   mount.innerHTML = `
     <div class="pm">
-      <div class="pm-crumbs"><a href="${closed ? '#/pm/uzavrene' : '#/pm'}">← ${closed ? 'Uzavřené projekty' : 'Přehled projektů'}</a></div>
+      <div class="pm-crumbs"><a href="${closed ? '#/profit' : '#/pm'}">← ${closed ? 'Ziskovost projektů' : 'Přehled projektů'}</a></div>
       <div class="page-head">
         <h1>${esc(project.name)}
           ${closed ? `<span class="status status-won">uzavřený</span>` : ''}

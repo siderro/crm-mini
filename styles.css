@@ -491,9 +491,6 @@ a.tile-btn:hover { text-decoration: none; }
 .pm-table .pm-date { color: var(--text-secondary); white-space: nowrap; }
 .pm-table .tone-over { color: var(--danger); font-weight: 500; }
 
-.pm-filters { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
-.pm-filter.active { background: var(--primary-tint); border-color: var(--primary); color: var(--primary); }
-.pm-closed-sum { margin-bottom: 20px; }
 .pm-cell-value.tone-over { color: var(--danger); }
 
 /* Měrky — stav v lidské řeči plus proužek, kde v okně jsme. */
@@ -725,6 +722,81 @@ a.tile-btn:hover { text-decoration: none; }
 .inc-item-date { flex: none; font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
 .inc-item-amount { flex: none; white-space: nowrap; font-size: 13px; }
 .inc-item.tone-over .inc-item-date, .inc-item.tone-over .inc-item-amount { color: var(--danger); }
+
+/* ── Ziskovost projektů ── */
+
+.prof-lead { font-size: 13px; margin-bottom: 16px; max-width: 720px; }
+.prof-filters { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.prof-filter.active { background: var(--primary-tint); border-color: var(--primary); color: var(--primary); }
+.prof-sum { margin-bottom: 20px; }
+
+.prof-table td { vertical-align: middle; }
+.prof-table tbody tr { cursor: pointer; }
+.prof-table .prof-name { font-weight: 500; }
+.prof-table .prof-date { color: var(--text-secondary); white-space: nowrap; }
+.prof-table th.prof-num, .prof-table td.prof-num { text-align: right; white-space: nowrap; }
+.prof-table .tone-over { color: var(--danger); font-weight: 500; }
+
+/* ── Výkon ── */
+
+.perf-lead { font-size: 13px; margin-bottom: 16px; max-width: 760px; }
+.perf-filters { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.perf-filter.active { background: var(--primary-tint); border-color: var(--primary); color: var(--primary); }
+.perf-sum { margin-bottom: 20px; }
+
+.perf-months {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+.perf-card { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px 8px; }
+.perf-card-empty { background: var(--surface-alt); border-style: dashed; }
+.perf-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--border);
+}
+.perf-card-month { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+.perf-card-total { font-weight: 600; white-space: nowrap; }
+.perf-card-use { font-size: 12px; color: var(--text-secondary); margin: 5px 0 6px; }
+.perf-card-use.tone-over { color: var(--warning); font-weight: 500; }
+.perf-card-none { font-size: 12px; padding: 2px 0; }
+
+.perf-person { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 1px 0; }
+.perf-person-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.perf-person-hours { flex: none; color: var(--text-secondary); }
+
+.perf-card-split {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 1px solid var(--border);
+}
+.perf-card-internal { font-size: 12px; margin-top: 1px; }
+
+/* ── Ziskovost lidí ── */
+
+.stf-lead { font-size: 13px; margin-bottom: 16px; max-width: 760px; }
+.stf-controls { display: flex; gap: 24px; margin-bottom: 16px; flex-wrap: wrap; }
+.stf-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.stf-filter.active, .stf-view.active {
+  background: var(--primary-tint);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.stf-sum { margin-bottom: 20px; }
+
+.stf-table td { vertical-align: middle; }
+.stf-table .stf-name { white-space: nowrap; }
+.stf-table th.stf-num, .stf-table td.stf-num { text-align: right; white-space: nowrap; }
+.stf-table .tone-over { color: var(--danger); font-weight: 500; }
+.stf-note { font-size: 12px; margin-top: 12px; max-width: 760px; line-height: 1.6; }
 
 /* ── Výplaty ── */
 
