@@ -13,17 +13,10 @@
 
 import { esc, formatDate, formatMoney, formatMoneyShort } from '../../util.js';
 import { getProjects, isBillable, BILLING_LABEL } from '../projects/store.js';
-
-/** Kolik dní po konci projektu se počítá s vystavením faktury. */
-const INVOICE_LAG_DAYS = 20;
-
-const RANGES = [
-  { id: 'next12', label: 'Příštích 12 měsíců' },
-  { id: 'year', label: 'Tento rok' },
-  { id: 'nextyear', label: 'Příští rok' },
-];
-
-const DEFAULT_RANGE = 'next12';
+import {
+  INVOICE_LAG_DAYS, RANGES, DEFAULT_RANGE, MONTH_NAMES,
+  monthsFor, rangeTotalLabel, parseDay, addDays, monthKey, slaForMonth, invoiceAmount,
+} from './logic.js';
 
 export const income = {
   id: 'income',
@@ -63,23 +56,6 @@ export const income = {
  * „tento rok" znamená zbytek roku, ne od ledna. Co mělo být vyfakturované
  * dřív a není, spadne do bloku „po termínu".
  */
-function monthsFor(rangeId, today) {
-  const y = today.getFullYear();
-  const m = today.getMonth();
-
-  const build = (year, from, count) =>
-    Array.from({ length: count }, (_, i) => new Date(year, from + i, 1));
-
-  switch (rangeId) {
-    case 'year': return build(y, m, 12 - m);
-    case 'nextyear': return build(y + 1, 0, 12);
-    default: return build(y, m, 12);
-  }
-}
-
-function rangeTotalLabel(rangeId) {
-  return RANGES.find((r) => r.id === rangeId)?.label || '';
-}
 
 /** Dlaždice na hubu: co má přijít tenhle měsíc a co se mělo dávno fakturovat. */
 async function tileInfo() {
@@ -113,52 +89,13 @@ async function tileInfo() {
   };
 }
 
-const MONTH_NAMES = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen',
-  'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
-
 /** 'YYYY-MM-DD' → půlnoc lokálně. Null pro prázdné i nesmyslné datum. */
-function parseDay(value) {
-  if (!value) return null;
-  const [y, m, d] = String(value).slice(0, 10).split('-').map(Number);
-  if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d);
-}
-
-function addDays(date, days) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-function monthKey(date) {
-  return `${date.getFullYear()}-${date.getMonth()}`;
-}
 
 /** Běží projekt v tomhle kalendářním měsíci? Rozhoduje překryv s termíny. */
-function runsInMonth(project, month) {
-  const start = parseDay(project.est_start);
-  const end = parseDay(project.est_end);
-  if (!start || !end) return false;   // bez termínů se plánovat nedá
-
-  const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
-  const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0);
-  return start <= monthEnd && end >= monthStart;
-}
 
 /** SLA za jeden měsíc: kolik projektů ho účtuje a za kolik dohromady. */
-function slaForMonth(projects, month) {
-  const active = projects.filter((p) => isBillable(p) && p.est_sla && runsInMonth(p, month));
-  return {
-    count: active.length,
-    amount: active.reduce((sum, p) => sum + (Number(p.est_sla) || 0), 0),
-  };
-}
 
 /** Kolik se za projekt vyfakturuje. Pro bono a interní nic. */
-function invoiceAmount(p) {
-  if (!isBillable(p)) return 0;
-  return (Number(p.est_price) || 0) + (Number(p.est_pm) || 0);
-}
 
 async function load(body, rangeId) {
   let projects;

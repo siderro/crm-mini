@@ -16,7 +16,12 @@ import { staff } from './staff/index.js';
 import { perf } from './perf/index.js';
 import { wiki } from './wiki/index.js';
 import { notes } from './notes.js';
+import { devdata } from './devdata/index.js';
 
-export const MODULES = [crm, todo, pm, timesheet, projectAccess, payroll, income, profit, staff, perf, wiki, notes];
+export const MODULES = [
+  crm, todo, pm, timesheet, projectAccess,
+  payroll, income, profit, staff, perf,
+  wiki, notes, devdata,
+];
 
 export const MODULE_BY_ID = Object.fromEntries(MODULES.map((m) => [m.id, m]));

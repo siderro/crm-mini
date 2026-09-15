@@ -11,6 +11,7 @@
 import { esc, formatDate, formatMoney } from '../../util.js';
 import { getProjects, BILLING_LABEL } from '../projects/store.js';
 import { statsForProjects } from '../projects/economics.js';
+import { RANGES, DEFAULT_RANGE, rangeBounds, inRange, fmtHours, czk } from './logic.js';
 
 export const profit = {
   id: 'profit',
@@ -42,33 +43,6 @@ export const profit = {
     load(mount.querySelector('#prof-body'), DEFAULT_RANGE);
   },
 };
-
-const RANGES = [
-  { id: 'year', label: 'Tento rok' },
-  { id: 'lastyear', label: 'Loňský rok' },
-  { id: 'all', label: 'Vše' },
-];
-
-const DEFAULT_RANGE = 'year';
-
-/** Hranice [od, do) jako 'YYYY-MM-DD'; null = neomezeno. */
-function rangeBounds(id) {
-  const year = new Date().getFullYear();
-  if (id === 'year') return [`${year}-01-01`, null];
-  if (id === 'lastyear') return [`${year - 1}-01-01`, `${year}-01-01`];
-  return [null, null];
-}
-
-function inRange(value, [from, to]) {
-  const day = String(value || '').slice(0, 10);
-  return (from === null || day >= from) && (to === null || day < to);
-}
-
-function fmtHours(n) {
-  return Number(Number(n).toFixed(1)).toLocaleString('cs-CZ');
-}
-
-const czk = (v) => formatMoney(Math.round(v || 0));
 
 /** Odhad hodin proti skutečnosti — kde se to utrhlo, je vidět hned. */
 function hoursCell(stats) {

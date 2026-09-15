@@ -10,7 +10,7 @@
 // Data zůstávají ve dvou storech (access/store.js a rates/store.js), protože
 // jsou to dvě různé tabulky. Slučuje se obrazovka, ne data.
 
-import { esc, formatDate, formatMoney } from '../../util.js';
+import { esc, formatDate, formatMoney, guard } from '../../util.js';
 import { MODULES } from '../registry.js';
 
 /** Moduly, které jde někomu zapnout — ty jen pro superadmina mezi ně nepatří. */
@@ -37,7 +37,8 @@ export const people = {
         <div id="people-body"><div class="loading">Načítám…</div></div>
       </div>`;
 
-    load(mount.querySelector('#people-body'));
+    const body = mount.querySelector('#people-body');
+    guard(body, () => load(body));
   },
 };
 

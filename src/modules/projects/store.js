@@ -21,33 +21,21 @@
 // jen editor modulu.
 
 import { sb, unwrap } from '../../supabase.js';
+import { LEVELS, ROLES, BILLING, num } from './model.js';
+
+// Pojmy žijí v model.js (jde je použít bez databáze); tady se jen přeposílají,
+// aby si je moduly mohly brát ze store jako dřív.
+export {
+  LEVELS, LEVEL_LABEL, ROLES, ROLE_LABEL, BILLING, BILLING_LABEL,
+  isBillable, MONEY_FIELDS,
+} from './model.js';
 
 const PROJECTS = 'projects';
 const MEMBERS = 'project_members';
 
-export const LEVELS = ['view', 'report'];
-export const LEVEL_LABEL = { view: 'vidí', report: 'vykazuje' };
-
-export const ROLES = ['designer', 'manager'];
-export const ROLE_LABEL = { designer: 'Designer', manager: 'Manager' };
-
-export const BILLING = ['client', 'probono', 'internal'];
-export const BILLING_LABEL = { client: 'Klientský', probono: 'Pro bono', internal: 'Interní' };
-
-/** Vydělává projekt? Pro bono a interní nemají výnos, marže se u nich nepočítá. */
-export function isBillable(project) {
-  return (project?.billing || 'client') === 'client';
-}
-
 /** Číselná pole projektu — jinde se na ně jen odkazujeme, ať se nerozejdou. */
-export const MONEY_FIELDS = ['est_price', 'est_pm', 'est_sla'];
 
 /** Prázdné pole je null, ne 0 — „nevyplněno" a „nula" nejsou totéž. */
-function num(value) {
-  if (value === '' || value == null) return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
 
 // ── Projekty ──
 

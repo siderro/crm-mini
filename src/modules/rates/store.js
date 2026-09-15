@@ -17,49 +17,21 @@
 // null — a náklad té práce se mu nikde nezobrazí.
 
 import { sb, unwrap } from '../../supabase.js';
+import { TYPES, today, num, hourlyOf, pick } from './model.js';
+
+// Pojmy a odvození hodinovky žijí v model.js; tady se jen přeposílají.
+export { TYPES, TYPE_LABEL, DEFAULT_MONTHLY_HOURS, today, hourlyOf } from './model.js';
 
 const TABLE = 'rates';
 
-export const TYPES = ['hourly', 'monthly'];
-
-export const TYPE_LABEL = { hourly: 'Hodinová', monthly: 'Měsíční paušál' };
-
-/** Kolik hodin za měsíc předvyplnit u paušálu, když se nic nezadá. */
-export const DEFAULT_MONTHLY_HOURS = 160;
-
 /** Dnešní datum jako 'YYYY-MM-DD' (lokální čas). */
-export function today() {
-  const d = new Date();
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-
-function num(value) {
-  if (value === '' || value == null) return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
 
 /**
  * Nákladová hodinovka záznamu. U paušálu se odvodí z částky a hodin.
  * Null, když se odvodit nedá (chybí hodiny nebo jsou nula).
  */
-export function hourlyOf(record) {
-  if (!record) return null;
-  if (record.type === 'monthly') {
-    const amount = Number(record.monthly_amount);
-    const hours = Number(record.monthly_hours);
-    if (!Number.isFinite(amount) || !Number.isFinite(hours) || hours <= 0) return null;
-    return amount / hours;
-  }
-  const rate = Number(record.rate);
-  return Number.isFinite(rate) ? rate : null;
-}
 
 /** Verze platná k danému dni z už načteného seznamu (řazeného od nejnovější). */
-function pick(rows, email, day) {
-  return rows.find((r) => r.email === email && (r.valid_from || '') <= day) || null;
-}
 
 /** Všechny verze sazeb jednoho člověka, nejnovější platnost nahoře. */
 export async function getRates(email) {

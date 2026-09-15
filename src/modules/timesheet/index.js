@@ -11,7 +11,7 @@
 // v modulu Projekty nebo v Nastavení). Výkaz patří tomu, kdo ho zapsal —
 // tady vidí a upravuje každý jen svoje.
 
-import { esc, formatDate, formatMoney } from '../../util.js';
+import { esc, formatDate, formatMoney, guard } from '../../util.js';
 import { getProjects, projectsFor } from '../projects/store.js';
 import { rateResolver } from '../rates/store.js';
 import { getEntries, addEntry, updateEntry, deleteEntry, KINDS, KIND_LABEL, KIND_SHORT } from './store.js';
@@ -44,8 +44,7 @@ export const timesheet = {
       </div>`;
 
     const view = mount.querySelector('#ts-view');
-    if (page === 'rucne') renderForm(view, email);
-    else renderMine(view, email);
+    guard(view, () => (page === 'rucne' ? renderForm(view, email) : renderMine(view, email)));
   },
 };
 
@@ -412,17 +411,17 @@ async function loadDay(view, email, date) {
 
 // ── Výpis ──
 
-const RANGES = [
+export const RANGES = [
   { id: 'month', label: 'Tento měsíc' },
   { id: 'lastmonth', label: 'Minulý měsíc' },
   { id: 'year', label: 'Tento rok' },
   { id: 'all', label: 'Vše' },
 ];
 
-const DEFAULT_RANGE = 'month';
+export const DEFAULT_RANGE = 'month';
 
 /** Hranice [od, do) jako 'YYYY-MM-DD'; null = neomezeno. */
-function rangeBounds(id) {
+export function rangeBounds(id) {
   const now = new Date();
   const iso = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
   const monthStart = (offset) => {
@@ -438,7 +437,7 @@ function rangeBounds(id) {
   }
 }
 
-function inRange(date, [from, to]) {
+export function inRange(date, [from, to]) {
   return (from === null || date >= from) && (to === null || date < to);
 }
 

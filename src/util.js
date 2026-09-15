@@ -1,5 +1,19 @@
 // Small shared helpers. One definition, used everywhere — no per-file copies.
 
+/**
+ * Spustí načítání a případnou chybu ukáže tam, kam se mělo vykreslit.
+ *
+ * Bez toho zůstane po chybě na obrazovce viset „Načítám…" a nikde se nic
+ * neobjeví — což vypadá jako zamrznutí, ne jako problém s připojením.
+ */
+export async function guard(el, load) {
+  try {
+    await load();
+  } catch (err) {
+    el.innerHTML = `<div class="error">Chyba: ${esc(err.message)}</div>`;
+  }
+}
+
 /** Escape text for safe insertion into HTML. */
 export function esc(value) {
   if (value == null) return '';

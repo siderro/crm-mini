@@ -13,11 +13,15 @@
 // náklad s nulovým výnosem a jsou vidět zvlášť, aby nekazily marži klientské
 // práce, ale ani se neztratily.
 
-import { esc, formatMoney } from '../../util.js';
+import { esc, guard } from '../../util.js';
 import { listUsers } from '../access/store.js';
 import { rateResolver } from '../rates/store.js';
 import { getEntries } from '../timesheet/store.js';
-import { getProjects, isBillable } from '../projects/store.js';
+import { getProjects } from '../projects/store.js';
+import {
+  RANGES, DEFAULT_RANGE, VIEWS, DEFAULT_VIEW, MONTH_NAMES,
+  czk, fmtHours, rangeBounds, inRange, soldRates, blank, add, finish, priceEntry,
+} from './logic.js';
 
 export const staff = {
   id: 'staff',
@@ -63,64 +67,12 @@ export const staff = {
         view = v;
         mount.querySelectorAll('.stf-view').forEach((b) => b.classList.toggle('active', b === e.target));
       }
-      load(body, range, view);
+      guard(body, () => load(body, range, view));
     });
 
-    load(body, range, view);
+    guard(body, () => load(body, range, view));
   },
 };
-
-const RANGES = [
-  { id: 'month', label: 'Tento měsíc' },
-  { id: 'lastmonth', label: 'Minulý měsíc' },
-  { id: 'year', label: 'Tento rok' },
-  { id: 'lastyear', label: 'Loňský rok' },
-  { id: 'all', label: 'Vše' },
-];
-
-const VIEWS = [
-  { id: 'people', label: 'Podle lidí' },
-  { id: 'time', label: 'V čase' },
-];
-
-const DEFAULT_RANGE = 'year';
-const DEFAULT_VIEW = 'people';
-
-const MONTH_NAMES = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen',
-  'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
-
-const czk = (v) => formatMoney(Math.round(v || 0));
-
-function fmtHours(n) {
-  return Number(Number(n).toFixed(1)).toLocaleString('cs-CZ');
-}
-
-function iso(y, m, d) {
-  return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-}
-
-/** Hranice [od, do] jako 'YYYY-MM-DD', obě včetně; null = neomezeno. */
-function rangeBounds(id) {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
-  const lastDay = (yy, mm) => new Date(yy, mm + 1, 0).getDate();
-
-  switch (id) {
-    case 'month': return [iso(y, m, 1), iso(y, m, lastDay(y, m))];
-    case 'lastmonth': {
-      const [py, pm] = m === 0 ? [y - 1, 11] : [y, m - 1];
-      return [iso(py, pm, 1), iso(py, pm, lastDay(py, pm))];
-    }
-    case 'year': return [iso(y, 0, 1), iso(y, 11, 31)];
-    case 'lastyear': return [iso(y - 1, 0, 1), iso(y - 1, 11, 31)];
-    default: return [null, null];
-  }
-}
-
-function inRange(date, [from, to]) {
-  return (from === null || date >= from) && (to === null || date <= to);
-}
 
 // ── Výpočet ──
 
@@ -129,48 +81,8 @@ function inRange(date, [from, to]) {
  * a pro PM; null znamená „nevíme" (chybí odhad) a takové hodiny se do
  * prodaného nezapočítají — radši mezera než vymyšlené číslo.
  */
-function soldRates(project, pmHours) {
-  if (!isBillable(project)) return { design: 0, pm: 0, unknown: false };
-
-  const price = project.final_price != null ? Number(project.final_price) : Number(project.est_price);
-  const estHours = Number(project.est_hours);
-  const pmBudget = Number(project.est_pm);
-
-  return {
-    design: price && estHours ? price / estHours : null,
-    // PM se dělí skutečně odpracovanými hodinami — rozpočet je fixní, takže
-    // čím víc se na něm dělá, tím míň každá hodina vydělá.
-    pm: pmBudget && pmHours ? pmBudget / pmHours : null,
-    unknown: !(price && estHours),
-  };
-}
-
-function blank() {
-  return { hours: 0, cost: 0, sold: 0, unknownHours: 0, internalHours: 0, internalCost: 0 };
-}
-
-function add(acc, e, rate, sold, billable) {
-  acc.hours += e.hours;
-  acc.cost += rate == null ? 0 : rate * e.hours;
-
-  if (!billable) {
-    acc.internalHours += e.hours;
-    acc.internalCost += rate == null ? 0 : rate * e.hours;
-    return;
-  }
-  if (sold == null) acc.unknownHours += e.hours;
-  else acc.sold += sold * e.hours;
-}
 
 /** Přínos = prodáno − náklad. Marže se počítá jen z toho, co se prodávalo. */
-function finish(acc) {
-  const billableCost = acc.cost - acc.internalCost;
-  return {
-    ...acc,
-    profit: acc.sold - billableCost,
-    margin: acc.sold ? ((acc.sold - billableCost) / acc.sold) * 100 : null,
-  };
-}
 
 async function collect(rangeId) {
   const [users, allEntries, projects] = await Promise.all([
@@ -196,16 +108,6 @@ async function collect(rangeId) {
 }
 
 /** Rozpad jednoho výkazu na náklad a prodanou hodnotu. */
-function priceEntry(e, byId, rates, rateOn) {
-  const project = byId[e.project_id];
-  const r = rates[e.project_id] || { design: null, pm: null };
-  return {
-    rate: rateOn(e.email, e.date),
-    sold: e.kind === 'pm' ? r.pm : r.design,
-    billable: project ? isBillable(project) : true,
-    project,
-  };
-}
 
 // ── Pohledy ──
 

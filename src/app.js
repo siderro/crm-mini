@@ -177,6 +177,23 @@ async function handleUser(user) {
 
 root.innerHTML = `<div class="login"><div class="login-card"><div class="loading">Načítám…</div></div></div>`;
 
+// Poslední záchranná síť. Kdyby někde chyba proklouzla bez ošetření, nesmí
+// skončit jen v konzoli — obrazovka by vypadala zamrzle a nikdo by nevěděl proč.
+window.addEventListener('unhandledrejection', (e) => {
+  const message = e.reason?.message || String(e.reason);
+  let bar = document.getElementById('app-error');
+
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'app-error';
+    bar.className = 'app-error';
+    document.body.appendChild(bar);
+  }
+  bar.innerHTML = `<span>Něco se nepovedlo: ${esc(message)}</span>
+    <button class="btn" id="app-error-close">Zavřít</button>`;
+  bar.querySelector('#app-error-close').addEventListener('click', () => bar.remove());
+});
+
 // Callback z onAuthStateChange se nemá blokovat vlastní async prací — odložíme ji.
 onAuthChange((user) => { setTimeout(() => handleUser(user), 0); });
 window.addEventListener('hashchange', () => { if (session) route(); });

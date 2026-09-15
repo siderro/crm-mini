@@ -1,9 +1,31 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 
-// Supabase UMD client is loaded from CDN in index.html.
-const { createClient } = supabase;
+// Klient se načítá z CDN v index.html (UMD, globální `supabase`).
+//
+// Vytváří se až při prvním použití, ne při načtení modulu. Dva důvody:
+//   · když CDN vypadne, dostaneš srozumitelnou hlášku místo bílé stránky
+//     (dřív to spadlo dřív, než se vůbec stihla spustit aplikace)
+//   · moduly jdou naimportovat i mimo prohlížeč, což potřebují testy
 
-export const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let client = null;
+
+function real() {
+  if (client) return client;
+
+  const lib = globalThis.supabase;
+  if (!lib?.createClient) {
+    throw new Error('Nepodařilo se načíst knihovnu Supabase. Zkontroluj připojení a obnov stránku.');
+  }
+  client = lib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  return client;
+}
+
+export const sb = new Proxy({}, {
+  get(_, prop) {
+    const value = real()[prop];
+    return typeof value === 'function' ? value.bind(real()) : value;
+  },
+});
 
 /**
  * Supabase vrací chybu v odpovědi, ne výjimkou. Storey ale mají chybu vyhodit,

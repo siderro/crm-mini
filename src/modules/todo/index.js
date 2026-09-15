@@ -4,7 +4,7 @@
 // Tok je jednosměrný: napíšu → odloží se vlevo → překlopím doprava na tiket →
 // odškrtnu → spadne do archivu.
 
-import { esc, formatDate, formatDateTime, ageShort } from '../../util.js';
+import { esc, formatDate, formatDateTime, ageShort, guard } from '../../util.js';
 import { getItems, addRaw, promote, updateText, setDone, deleteItem } from './store.js';
 
 export const todo = {
@@ -27,8 +27,7 @@ export const todo = {
       </div>`;
 
     const view = mount.querySelector('#todo-view');
-    if (archive) renderArchive(view);
-    else renderWork(view, email);
+    guard(view, () => (archive ? renderArchive(view) : renderWork(view, email)));
   },
 };
 
@@ -212,7 +211,7 @@ async function loadTickets(view, editingId = null) {
 // Filtr = časový rozsah [od, do), ne přihrádka. „Dnes" a „Včera" proto leží
 // uvnitř „Tento týden" — tak to člověk při zpětném pohledu čte.
 
-const RANGES = [
+export const RANGES = [
   { id: 'today', label: 'Dnes' },
   { id: 'yesterday', label: 'Včera' },
   { id: 'week', label: 'Tento týden' },
@@ -222,17 +221,17 @@ const RANGES = [
   { id: 'all', label: 'Vše' },
 ];
 
-const DEFAULT_RANGE = 'week';
+export const DEFAULT_RANGE = 'week';
 
 /** Půlnoc daného dne. */
-function startOfDay(date) {
+export function startOfDay(date) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
   return +d;
 }
 
 /** Pondělí toho týdne, do kterého datum spadá, v 00:00. */
-function startOfWeek(date) {
+export function startOfWeek(date) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7));   // Po = 0
@@ -240,7 +239,7 @@ function startOfWeek(date) {
 }
 
 /** Hranice [od, do) pro každý filtr; null = neomezeno. */
-function rangeBounds(id) {
+export function rangeBounds(id) {
   const now = new Date();
   const today = startOfDay(now);
   const yesterday = today - 86400000;
@@ -259,7 +258,7 @@ function rangeBounds(id) {
   }
 }
 
-function inRange(doneAt, [from, to]) {
+export function inRange(doneAt, [from, to]) {
   const t = new Date(doneAt).getTime();
   if (Number.isNaN(t)) return from === null;
   return (from === null || t >= from) && (to === null || t < to);

@@ -11,11 +11,12 @@
 // příjem mimo cenu projektu. Zisk se ukazuje až u uzavřeného projektu —
 // dokud běží, je poctivé jen „spotřebováno X z ceny".
 
-import { esc, formatDate, formatMoney } from '../../util.js';
+import { esc, formatDate, formatMoney, guard } from '../../util.js';
 import { listUsers } from '../access/store.js';
 import { rateResolver } from '../rates/store.js';
 import { getEntries, KIND_SHORT } from '../timesheet/store.js';
 import { projectStats, statsForProjects, snapshotFor } from './economics.js';
+import { timeMeter, designMeter, pmMeter, fmtHours } from './meters.js';
 import {
   getProjects, getProject, addProject, updateProject, deleteProject,
   closeProject, reopenProject, getProjectMembers, memberCountByProject, setMember,
@@ -32,9 +33,11 @@ export const pm = {
     const canEdit = !!ctx.canEdit;
     const page = subPath[0] || null;
 
-    if (page === 'novy') { renderCreate(mount, canEdit); return; }
-    if (page) { renderDetail(mount, page, canEdit); return; }
-    renderList(mount, canEdit);
+    guard(mount, () => {
+      if (page === 'novy') return renderCreate(mount, canEdit);
+      if (page) return renderDetail(mount, page, canEdit);
+      return renderList(mount, canEdit);
+    });
   },
 };
 
@@ -43,11 +46,6 @@ const money = (v) => (v == null ? '—' : formatMoney(v));
 const date = (v) => (v ? formatDate(v) : '—');
 const czk = (v) => formatMoney(Math.round(v || 0));
 
-/** Hodiny bez zbytečných desetinných míst. */
-function fmtHours(n) {
-  return Number(Number(n).toFixed(1)).toLocaleString('cs-CZ');
-}
-
 function subnav(active, canEdit) {
   const link = (id, href, label) =>
     `<a href="${href}" class="subnav-link${id === active ? ' active' : ''}">${label}</a>`;
@@ -55,123 +53,6 @@ function subnav(active, canEdit) {
     ${link('open', '#/pm', 'Běžící')}
     ${canEdit ? link('new', '#/pm/novy', 'Přidat projekt') : ''}
   </nav>`;
-}
-
-// ── Stav projektu v lidské řeči ──
-//
-// Přehled má na první pohled říct, jak na tom projekt je — ne vysypat čísla.
-
-/** „za X" — 1 den, 3 dny, 5 dní. */
-function days(n) {
-  if (n === 1) return '1 den';
-  if (n >= 2 && n <= 4) return `${n} dny`;
-  return `${n} dní`;
-}
-
-/** „před X" — 1 dnem, 7 dny. Sedmý pád má v množném čísle jeden tvar. */
-function daysAgo(n) {
-  return n === 1 ? '1 dnem' : `${n} dny`;
-}
-
-/** „zbývá X" — sloveso se musí shodnout s číslem. */
-function daysLeft(n) {
-  if (n === 1) return 'zbývá 1 den';
-  if (n >= 2 && n <= 4) return `zbývají ${n} dny`;
-  return `zbývá ${n} dní`;
-}
-
-/** 'YYYY-MM-DD' → půlnoc lokálně. Null pro prázdné i nesmyslné datum. */
-function parseDay(value) {
-  if (!value) return null;
-  const [y, m, d] = String(value).split('-').map(Number);
-  if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d);
-}
-
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-/** Celé dny mezi dvěma půlnocemi. */
-function dayDiff(from, to) {
-  return Math.round((to - from) / 86400000);
-}
-
-function clamp(pct) {
-  return Math.max(0, Math.min(100, Math.round(pct)));
-}
-
-/**
- * Kde je projekt v čase.
- * tone: 'muted' (nevíme) | 'idle' (ještě nezačal) | 'ok' | 'warn' (do konce
- * pár dní) | 'over' (mělo už skončit).
- */
-function timeMeter(p) {
-  const start = parseDay(p.est_start);
-  const end = parseDay(p.est_end);
-  const now = startOfToday();
-
-  if (!start && !end) return { tone: 'muted', text: 'bez termínu', percent: null };
-
-  if (start && now < start) {
-    return { tone: 'idle', text: `začíná za ${days(dayDiff(now, start))}`, percent: 0 };
-  }
-
-  if (end && now > end) {
-    return { tone: 'over', text: `mělo skončit před ${daysAgo(dayDiff(end, now))}`, percent: 100 };
-  }
-
-  if (!end) {
-    return { tone: 'ok', text: `běží od ${formatDate(p.est_start)}`, percent: null };
-  }
-
-  const left = dayDiff(now, end);
-  const total = start ? dayDiff(start, end) : 0;
-  return {
-    tone: left <= 3 ? 'warn' : 'ok',
-    text: left === 0 ? 'končí dnes' : daysLeft(left),
-    percent: start ? (total > 0 ? clamp((dayDiff(start, now) / total) * 100) : 100) : null,
-  };
-}
-
-/** Designové hodiny proti odhadu. PM hodiny sem nepatří. */
-function designMeter(stats) {
-  const { hours, estHours, overHours } = stats.design;
-
-  if (!estHours) {
-    return hours
-      ? { tone: 'ok', text: `${fmtHours(hours)} h natrackováno`, percent: null }
-      : { tone: 'muted', text: 'bez odhadu', percent: null };
-  }
-
-  const base = `${fmtHours(hours)} / ${fmtHours(estHours)} h`;
-
-  if (overHours) {
-    return { tone: 'over', text: `${base} · přeteklo o ${fmtHours(overHours)} h`, percent: 100 };
-  }
-  const pct = (hours / estHours) * 100;
-  return { tone: pct >= 90 ? 'warn' : 'ok', text: base, percent: clamp(pct) };
-}
-
-/** PM se měří v penězích — je tak i zadaný. */
-function pmMeter(stats) {
-  const { cost, budget, over } = stats.pm;
-
-  if (!budget) {
-    return cost
-      ? { tone: 'ok', text: `${czk(cost)} odpracováno`, percent: null }
-      : { tone: 'muted', text: 'bez PM', percent: null };
-  }
-
-  const base = `${czk(cost)} / ${formatMoney(budget)}`;
-
-  if (over) {
-    return { tone: 'over', text: `${base} · přeteklo o ${czk(over)}`, percent: 100 };
-  }
-  const pct = (cost / budget) * 100;
-  return { tone: pct >= 90 ? 'warn' : 'ok', text: base, percent: clamp(pct) };
 }
 
 function meterCell(meter) {

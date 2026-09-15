@@ -16,6 +16,7 @@ import { listUsers } from '../access/store.js';
 import { rateRecordResolver } from '../rates/store.js';
 import { getEntries } from '../timesheet/store.js';
 import { getProjects, isBillable } from '../projects/store.js';
+import { RANGES, DEFAULT_RANGE, MONTH_NAMES, fmtHours, pct, shortName, monthsFor, monthKey, lastDayIso } from './logic.js';
 
 export const perf = {
   id: 'perf',
@@ -49,54 +50,10 @@ export const perf = {
   },
 };
 
-const RANGES = [
-  { id: 'last12', label: 'Posledních 12 měsíců' },
-  { id: 'year', label: 'Tento rok' },
-  { id: 'lastyear', label: 'Loňský rok' },
-];
-
-const DEFAULT_RANGE = 'last12';
-
-const MONTH_NAMES = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen',
-  'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
-
-function fmtHours(n) {
-  return Number(Number(n).toFixed(1)).toLocaleString('cs-CZ');
-}
-
-function pct(part, whole) {
-  return whole ? Math.round((part / whole) * 100) : null;
-}
-
-/** Jméno do úzké karty — e-mail bez domény. */
-function shortName(email) {
-  return String(email).split('@')[0];
-}
-
 /**
  * Měsíce, které přehled ukazuje. Kouká se zpátky — je to odvedená práce,
  * ne plán. „Tento rok" proto končí aktuálním měsícem.
  */
-function monthsFor(rangeId) {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
-
-  if (rangeId === 'year') return Array.from({ length: m + 1 }, (_, i) => new Date(y, i, 1));
-  if (rangeId === 'lastyear') return Array.from({ length: 12 }, (_, i) => new Date(y - 1, i, 1));
-  return Array.from({ length: 12 }, (_, i) => new Date(y, m - 11 + i, 1));
-}
-
-function monthKey(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function lastDayIso(date) {
-  const y = date.getFullYear();
-  const m = date.getMonth();
-  const d = new Date(y, m + 1, 0).getDate();
-  return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-}
 
 async function load(body, rangeId) {
   let users, entries, projects, recordOn;
