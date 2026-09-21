@@ -120,10 +120,14 @@ test('marginOf: nula výnosu nedělí nulou', () => {
 
 test('měrka termínu: před začátkem, v běhu, po termínu', () => {
   const today = new Date();
+  // Lokálně, ne přes toISOString(): parseDay() v meters.js staví lokální
+  // půlnoc, takže UTC převod by po půlnoci posunul datum o den a měrka by
+  // vyšla o jeden den vedle. (Přesně to se tu jednou stalo.)
   const day = (offset) => {
     const d = new Date(today);
     d.setDate(d.getDate() + offset);
-    return d.toISOString().slice(0, 10);
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   };
 
   assert.equal(timeMeter({ est_start: day(10), est_end: day(40) }).tone, 'idle');

@@ -69,6 +69,24 @@ vypadala skvěle na začátku a průběžně klesala — to není informace, to 
 Při uzavření se zadá **skutečně fakturovaná cena** (může se lišit od odhadu)
 a čísla se zmrazí do snapshotu.
 
+### Náklady mimo mzdy jsou firemní, ne projektové
+
+Nájem, software, pojištění, oprava auta — to firmu stojí peníze bez ohledu na
+to, na čem zrovna dělá. **Do ziskovosti projektu proto nevstupují.** Kdyby se
+rozpouštěly na projekty nějakým klíčem, byl by ten klíč vymyšlený a zisk by
+přestal být měřitelný.
+
+Žijí ve svém modulu a sčítají se až ve výhledu, proti očekávaným příjmům.
+Dva tvary:
+
+- **pravidelné** — každý měsíc, nebo jednou za rok v daném měsíci; mají
+  platnost od–do, aby vypovězené předplatné nefigurovalo ve výhledu navěky
+- **jednorázové** — nebagatelní výdaj s očekávaným datem
+
+Roční položka spadne do svého měsíce **celá**. Dvanáctina se ukazuje jen
+v souhrnu jako průměr — ve výhledu by rozpuštění na dvanáctiny zakrylo, že
+v březnu opravdu odejde 24 000 najednou.
+
 ### Pro bono a interní nemají výnos
 
 Typ projektu je `client` / `probono` / `internal`. U posledních dvou se marže
@@ -96,26 +114,30 @@ se orazítkuje při zápisu:
      │        Projekty ──> Pracovní výkaz ──> hodiny × sazba
      │           │ odhady          │
      ▼           ▼                 ▼
- Přístupy    Příjmy výhled    Ziskovost projektů ─┐
- do projektů  (co přijde)     Ziskovost lidí      │
-                              Výkon (kapacita)    │
-                                    Výplaty ◄─────┘
+ Přístupy   Finance výhled    Ziskovost projektů ─┐
+ do projektů      ▲           Ziskovost lidí      │
+                  │           Výkon (kapacita)    │
+               Náklady              Výplaty ◄─────┘
+          (firemní, ne projektové)
+
+ Finance výhled bere odhady z Projektů, položky z Nákladů
+ a paušály ze sazeb. Zdroje se dají jednotlivě vypnout.
 ```
 
 | Modul | K čemu je |
 |---|---|
-| **CRM** | Příležitosti před zakázkou: otevřené, zmrazené, vyhrané, prohrané |
+| **Pracovní výkaz** | Tracker (hlavní cesta) + ruční zápis + můj výkaz |
 | **To-Do** | Rychlý sběr myšlenek vlevo, tikety vpravo, archiv hotového |
 | **Projekty** | Odhady, tým, ekonomika, uzavírání. Hlavní přehled řízení. |
-| **Pracovní výkaz** | Tracker (hlavní cesta) + ruční zápis + můj výkaz |
+| **CRM** | Příležitosti před zakázkou: otevřené, zmrazené, vyhrané, prohrané |
+| **Náklady** | Pravidelné a jednorázové výdaje mimo mzdy |
 | **Výplaty** | Kolik komu za období zaplatit |
-| **Příjmy výhled** | Kdy a kolik má přijít — fakturace 20 dní po konci projektu, plus SLA |
+| **Finance výhled** | Co přijde a co odejde po měsících; zdroje se zapínají checkboxy |
 | **Ziskovost projektů** | Jak dopadly uzavřené projekty |
 | **Ziskovost lidí** | Prodaná hodina proti nákladu |
 | **Výkon** | Kolik hodin máme a kolik jich odvedeme |
 | **ŠG wiki** | Interní znalostní báze, vlastní markdown |
-| **Notes** | Placeholder, zatím nic |
-| **Lidé** *(nastavení)* | Práva k modulům a nákladové sazby |
+| **Lidé** *(nastavení)* | Role, práva k modulům a nákladové sazby |
 | **Přístupy do projektů** *(nastavení)* | Kdo který projekt vidí a kam smí vykazovat |
 | **Testovací data** *(nastavení)* | Vygeneruje nebo smaže dummy data pro testování |
 
@@ -123,27 +145,79 @@ se orazítkuje při zápisu:
 
 ## Model přístupů
 
-**Superadmin plyne z konfigurace** (`src/config.js`), ne z dat. Jinak by šel
-odkliknout nebo přepsat v databázi.
+Otázka „na co má tenhle člověk právo" se rozpadá na **tři nezávislé osy**.
+Míchat je do jedné je nejčastější chyba, protože role zní jako jedna věc.
 
-Ostatní dostávají moduly jednotlivě, s úrovní:
-- **`read`** — vidí, needituje
-- **`edit`** — vidí a mění
+| Osa | Otázka | Kde se vynucuje |
+|---|---|---|
+| **Moduly** | které obrazovky vidím | `app_users.modules`, mapa `{ modul: read \| edit }` |
+| **Řádky** | které záznamy uvnitř modulu vidím | hodnost role v RLS |
+| **Mazání** | smím ničit historii | restriktivní politiky v RLS |
 
-Moduly s penězi mají `superadminOnly` — nedají se nikomu zapnout a nejsou ani
-v tabulce práv.
+### Superadmin stojí mimo data
 
-K projektům je druhá, nezávislá vrstva: **`view`** (vidí) a **`report`**
-(vidí a smí do něj vykazovat).
+**Plyne z konfigurace** (`src/config.js` + `is_superadmin()` v migraci), ne
+z tabulky. Je to jediné právo, které nejde získat zápisem do databáze — kdyby
+plynulo z `role`, stačilo by přepsat řádek.
+
+Je to **seznam**, ne jeden e-mail. Jeden účet by znamenal, že jeho ztrátou už
+nikdo nikdy nikomu nepřidělí práva.
+
+### Role
+
+`designer` < `manager` < `admin` < `superadmin`. Role dělá dvě věci najednou:
+
+**Je to předloha modulů.** Výběr role **zapíše** odpovídající mapu do
+`app_users.modules` (`src/modules/access/roles.js`). Materializuje se schválně:
+živé pravidlo by znamenalo seznam „role → moduly" dvakrát — v JS pro UI a v SQL
+pro RLS — a dvě kopie téže pravdy se rozejdou. Takhle je „co tenhle člověk
+vidí" odpověditelné pohledem na jeden řádek.
+
+Cena: změna předlohy se nepropíše zpětně. Proto Lidé píšou u upravené mapy
+**„(upraveno)"** a nabídnou *Srovnat s rolí*. Viditelné, ne kouzelné.
+
+**Je to hodnost.** Podle ní RLS rozhoduje, které řádky člověk uvidí:
+
+| | Výkazy | Projekty | Wiki |
+|---|---|---|---|
+| **designer** | jen svoje | jen ty, kde je přiřazený | podle `min_role` stránky |
+| **manager** a výš | všechny | všechny | " |
+
+Hodnost platí **živě** — na rozdíl od předlohy. Je to bezpečnostní hranice,
+takže se nesmí materializovat.
+
+Designér schválně nedostává modul **Projekty**. Ne kvůli tajemství: ekonomika
+projektu se sčítá ze *všech* výkazů na něm, a když mu RLS cizí výkazy odřízne,
+viděl by tiše podhodnocenou spotřebu. Číslo, které vypadá platně a není, je
+horší než žádné.
+
+### Peníze rolí neplynou
+
+Moduly s penězi mají `superadminOnly` — nedají se nikomu zapnout, nejsou
+v tabulce práv a **nerozdává je ani role `admin`**. Kdo má admina, může
+všechno krom peněz a krom mazání.
+
+### Mazání není třetí úroveň
+
+`read`/`edit` zůstávají dvě. Mazání projektů, lidí a wiki stránek je omezené
+na superadmina **restriktivní** politikou — permisivní politiky se v Postgresu
+slučují přes OR, takže užší `for delete` vedle `for all` by neomezila nic.
+CRM a To-Do omezené nejsou; smazaná příležitost není ztráta historie.
+
+### Projekty mají vlastní vrstvu
+
+Nezávisle na všem výše: **`view`** (vidí) a **`report`** (vidí a smí do něj
+vykazovat).
 
 ### Hlídá to databáze, ne prohlížeč
 
 `canAccess()` a `canEdit()` v prohlížeči jen schovávají tlačítka. Skutečnou
-hranicí jsou **RLS politiky v Postgresu** (`supabase/migrations/001_init.sql`),
+hranicí jsou **RLS politiky v Postgresu** (`supabase/migrations/001_init.sql` a `004_roles.sql`),
 ověřené skriptem `supabase/tests/rls.sql`. Politiky zajišťují mimo jiné to, že:
 
 - účet mimo doménu nepřečte nic
-- **nikdo si nemůže přepsat vlastní práva** (při přihlášení smí posunout jen `last_login`)
+- **nikdo si nemůže přepsat vlastní práva ani vlastní roli** (při přihlášení smí
+  posunout jen `last_login`)
 - sazby čte jen jejich vlastník a superadmin
 - vykazovat jde jen za sebe, jen do projektu s `report`, jen dokud běží
 - projekt s výkazy nejde smazat
@@ -153,17 +227,25 @@ ověřené skriptem `supabase/tests/rls.sql`. Politiky zajišťují mimo jiné t
 ## Testovací data
 
 V Nastavení je generátor, který naplní systém vymyšlenými daty: pět lidí
-(e-maily s předponou `test.`), deset projektů v různých stavech, sazby včetně
-paušálů, roční historii výkazů, příležitosti, wiki a úkoly.
+s rolemi (e-maily s předponou `test.`), deset projektů v různých stavech, sazby
+včetně paušálů, roční historii výkazů, pravidelné i jednorázové náklady,
+příležitosti, wiki a úkoly.
 
 Běží jako funkce v databázi (`generate_dummy_data`), protože z prohlížeče nejde
 zapsat výkaz za někoho jiného — a to je správně, RLS to zakazuje. Funkce je
 `security definer`, ale sama si ověří, že ji volá superadmin.
 
 Všechno vygenerované nese příznak `is_dummy`, takže **mazání se nemůže dotknout
-opravdových dat** a nemusí znát žádná jména. Uzavřené dummy projekty nemají
-snapshot — jejich zisk se dopočítává živě, takže na nich nejde ověřit, že
-uzavření čísla zmrazí. To se testuje na opravdovém projektu.
+opravdových dat** a nemusí znát žádná jména.
+
+**Snapshoty uzavřených projektů dopočítá až klient**, toutéž funkcí, kterou
+používá opravdové uzavření. Šlo by to v SQL, ale znamenalo by to mít pravidla
+o penězích ve dvou jazycích — a jakmile se rozejdou, testovací data začnou
+„dokazovat" něco jiného, než co dělá aplikace.
+
+Pravidlo, které drží daň za generátor na uzdě: **plní se jen to, bez čeho modul
+nejde posoudit, ne každý sloupec.** Každá nová tabulka znamená větev ve třech
+funkcích, a protože jsou v zamčené migraci, i novou migraci.
 
 ## Vědomá omezení
 
@@ -171,11 +253,11 @@ Tohle nejsou chyby, jsou to rozhodnutí. Když se změní podmínky, změní se 
 
 | Omezení | Proč |
 |---|---|
-| **Hodiny a projektová data nejsou chráněná před kolegy s právem na Projekty.** Sazby ano, takže mzdy jsou v bezpečí — ale kdo smí číst Projekty, dostane se přes konzoli k výkazům ostatních. | Zatím má právo na Projekty jen superadmin. Až to přestane platit, je to na řešení. |
+| **Manažer a výš vidí výkazy všech.** Designér vidí jen svoje, ale od manažera nahoru je ta hranice pryč. | Řídit kapacitu a ziskovost bez cizích hodin nejde. Mzdy v bezpečí zůstávají: `rates` čte jen vlastník a superadmin, takže manažerovi se náklad ukáže jako „bez sazby“, ne jako nula. |
 | **Snapshot při uzavření zapisuje klient.** Kdo smí editovat projekty, může si do něj teoreticky napsat libovolný zisk. | Interní nástroj, okruh lidí je malý a známý. |
 | **Odvozená hodinovka z paušálu je odhad.** Platí, jen když ten člověk odpracuje slíbené hodiny. | Přesné rozpouštění by šlo spočítat až po konci měsíce a zpětně měnit čísla projektů. |
 | **Kapacitu známe jen u paušálů.** Hodinoví lidé nemají kde mít slíbený počet hodin, takže využití ve Výkonu může přelézt 100 %. | Šlo by přidat pole, zatím není potřeba. |
-| **SLA není v ziskovosti.** | Chybí evidence nákladů na služby třetích stran, které pokrývá. |
+| **SLA není v ziskovosti.** | Náklady se sice evidují (modul Náklady), ale nepárují se k projektu — nejde říct, kolik z nich pokrývá které SLA. |
 | **Souběžná editace nemá zámky.** Když dva mění stejný řádek, vyhraje poslední. | Dva lidé na jednom řádku se tu prakticky nestávají. |
 | **Aplikace nemá build.** Jede jako čisté ES moduly z CDN. | Míň pohyblivých částí; nasazení je `git push`. |
 
@@ -184,7 +266,6 @@ Tohle nejsou chyby, jsou to rozhodnutí. Když se změní podmínky, změní se 
 ## Co systém vědomě neumí
 
 - fakturaci (co se vystavilo a co je zaplacené) — jen plán, co má přijít
-- evidenci nákladů mimo mzdy
 - kontakty a firmy — staré CRM je mělo, tohle ne
 - notifikace, e-maily, exporty
 - mobilní aplikaci (rozložení se skládá, ale nikdo to pořádně neproklikal)

@@ -5,7 +5,7 @@
 // Projekty se tady nezakládají ani neupravují — to patří do modulu Projekty.
 // Přiřazovat jde jen do aktivních; archivovaný projekt ve sloupcích není.
 
-import { esc } from '../../util.js';
+import { esc, flash } from '../../util.js';
 import { listUsers } from '../access/store.js';
 import { getProjects, getMembers, setMember, LEVEL_LABEL } from './store.js';
 
@@ -18,7 +18,15 @@ export const projectAccess = {
   render(mount, subPath = [], ctx = {}) {
     mount.innerHTML = `
       <div class="pacc">
-        <div class="page-head"><h1>Přístupy do projektů</h1></div>
+        <div class="page-head">
+          <h1>Přístupy do projektů</h1>
+          <span class="form-msg" id="pacc-msg"></span>
+        </div>
+        <p class="lead">
+          <strong>vidí</strong> = uvidí projekt v přehledu.
+          <strong>vykazuje</strong> = smí do něj zapisovat čas.
+          Ukládá se hned při přepnutí.
+        </p>
         <div id="pacc-matrix"><div class="loading">Načítám…</div></div>
       </div>`;
 
@@ -36,7 +44,7 @@ async function renderMatrix(el, canEdit) {
   }
 
   if (!users.length) {
-    el.innerHTML = `<div class="empty-state">Zatím se nikdo nepřihlásil.</div>`;
+    el.innerHTML = `<div class="empty-state">Kromě tebe se zatím nikdo nepřihlásil. Přístup dostane, až se poprvé přihlásí přes Google.</div>`;
     return;
   }
   if (!projects.length) {
@@ -60,7 +68,7 @@ async function renderMatrix(el, canEdit) {
       const opt = (value, label) =>
         `<option value="${value}"${level === value ? ' selected' : ''}>${label}</option>`;
       return `<td class="pacc-cell">
-        <select data-project="${esc(p.id)}">
+        <select data-project="${esc(p.id)}" data-saved="${esc(level)}">
           ${opt('', '—')}${opt('view', LEVEL_LABEL.view)}${opt('report', LEVEL_LABEL.report)}
         </select>
       </td>`;
@@ -70,18 +78,39 @@ async function renderMatrix(el, canEdit) {
   }).join('');
 
   el.innerHTML = `
-    <table class="table pacc-table">
+    <div class="table-scroll"><table class="table pacc-table">
       <thead><tr><th>Člověk</th>${heads}</tr></thead>
       <tbody>${rows}</tbody>
-    </table>`;
+    </table></div>`;
 
   if (!canEdit) return;
 
-  // Ukládá se hned při přepnutí, bez tlačítka — stejně jako v Přístupech.
+  // Jedna hodnota → ukládá se hned při přepnutí, bez tlačítka. Musí se ale
+  // ozvat: nic se tu nepřekresluje, takže bez hlášky nejde poznat, jestli
+  // zápis prošel — a chyba by spadla jen do globální lišty.
+  const msg = document.querySelector('#pacc-msg');
+
   el.onchange = async (e) => {
     const projectId = e.target.dataset.project;
     if (!projectId) return;
-    const email = e.target.closest('tr').dataset.email;
-    await setMember(projectId, email, e.target.value || null);
+
+    const row = e.target.closest('tr');
+    const email = row.dataset.email;
+    const level = e.target.value || null;
+    const puvodni = e.target.dataset.saved ?? '';
+
+    try {
+      await setMember(projectId, email, level);
+      e.target.dataset.saved = level || '';
+      flash(msg, `Uloženo — ${shortName(email)}: ${level ? LEVEL_LABEL[level] : 'bez přístupu'}`);
+    } catch (err) {
+      e.target.value = puvodni;   // neuložilo se, tak ať to políčko netvrdí opak
+      flash(msg, `Chyba: ${err.message}`, 'error');
+    }
   };
+}
+
+/** Jméno z e-mailu do krátké hlášky. */
+function shortName(email) {
+  return String(email).split('@')[0];
 }

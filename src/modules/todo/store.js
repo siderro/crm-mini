@@ -23,14 +23,20 @@ export async function getItems(stage) {
   );
 }
 
-/** Odloží text do levého sloupce. Prázdný text se zahazuje. */
-export async function addRaw(email, text) {
-  const value = (text || '').trim();
-  if (!value || !email) return null;
+/**
+ * Víc poznámek najednou — jedním dotazem, ne v cyklu.
+ *
+ * Rychlý sběr je od toho, aby šlo vysypat hlavu naráz; deset řádků znamenalo
+ * deset kol po síti za sebou a znatelnou prodlevu, než se pole vyprázdnilo.
+ */
+export async function addRawMany(email, texts) {
+  const rows = (texts || [])
+    .map((t) => (t || '').trim())
+    .filter(Boolean)
+    .map((text) => ({ email, text, stage: 'raw' }));
 
-  return unwrap(await sb.from(TABLE).insert({
-    email, text: value, stage: 'raw',
-  }).select().single());
+  if (!email || !rows.length) return [];
+  return unwrap(await sb.from(TABLE).insert(rows).select());
 }
 
 /** Překlopí raw poznámku na tiket. */

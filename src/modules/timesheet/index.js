@@ -11,8 +11,12 @@
 // v modulu Projekty nebo v Nastavení). Výkaz patří tomu, kdo ho zapsal —
 // tady vidí a upravuje každý jen svoje.
 
-import { esc, formatDate, formatMoney, guard } from '../../util.js';
+import { esc, formatDate, formatMoney, guard, wireKeys, flash } from '../../util.js';
 import { getProjects, projectsFor } from '../projects/store.js';
+import { SUPERADMIN_EMAILS } from '../../config.js';
+
+// Komu napsat, když člověk nemá kam vykazovat.
+const CONTACT = SUPERADMIN_EMAILS[0];
 import { rateResolver } from '../rates/store.js';
 import { getEntries, addEntry, updateEntry, deleteEntry, KINDS, KIND_LABEL, KIND_SHORT } from './store.js';
 import {
@@ -181,7 +185,8 @@ async function renderPending(view, email, t, onDone) {
   if (!projects.length) {
     view.innerHTML = `<div class="error">
       Máš naměřeno ${esc(formatDuration(elapsedMs(t)))}, ale nemáš přiřazený žádný projekt,
-      do kterého bys mohl vykazovat.
+      do kterého bys mohl vykazovat. Napiš <a href="mailto:${esc(CONTACT)}">${esc(CONTACT)}</a> —
+      <strong>naměřený čas zůstane uložený</strong>, dokud ho nezahodíš.
     </div>`;
     return;
   }
@@ -207,12 +212,13 @@ async function renderPending(view, email, t, onDone) {
         <textarea class="input ts-note" id="tr-note" rows="3" placeholder="Co se dělalo…"></textarea>
       </label>
     </div>
-    <div class="ts-actions">
+    <div class="form-actions">
+      <button id="tr-discard" class="btn btn-danger">Zahodit naměřený čas</button>
+      <span class="form-actions-gap"></span>
+      <span id="tr-msg" class="form-msg"></span>
       <button id="tr-save" class="btn btn-primary">Uložit výkaz</button>
-      <button id="tr-discard" class="btn btn-danger">Zahodit</button>
-      <span id="tr-msg" class="ts-msg"></span>
     </div>
-    <p class="muted tr-note">Zapíše se na ${esc(formatDate(day))} — den, kdy měření začalo.</p>
+    <p class="note">Zapíše se na ${esc(formatDate(day))} — den, kdy měření začalo.</p>
     </div>`;
 
   const projectSelect = view.querySelector('#tr-project');
@@ -224,10 +230,9 @@ async function renderPending(view, email, t, onDone) {
     kindSelect.value = kindForRole(picked?.role);
   });
 
-  view.querySelector('#tr-save').addEventListener('click', async () => {
+  const ulozit = async () => {
     if (hours <= 0) {
-      msg.textContent = 'Naměřený čas je moc krátký na zápis.';
-      msg.className = 'ts-msg error';
+      flash(msg, 'Naměřený čas je moc krátký na zápis.', 'error');
       return;
     }
 
@@ -241,14 +246,16 @@ async function renderPending(view, email, t, onDone) {
     });
 
     if (!entry) {
-      msg.textContent = 'Uložení se nepovedlo.';
-      msg.className = 'ts-msg error';
+      flash(msg, 'Uložení se nepovedlo.', 'error');
       return;
     }
 
     clearTracker();
     onDone();
-  });
+  };
+
+  wireKeys(view, { submit: ulozit });
+  view.querySelector('#tr-save').addEventListener('click', ulozit);
 
   view.querySelector('#tr-discard').addEventListener('click', () => {
     if (!confirm(`Zahodit naměřených ${formatDuration(ms)}?`)) return;
@@ -296,6 +303,7 @@ async function renderForm(view, email) {
   if (!projects.length) {
     view.innerHTML = `<div class="empty-state">
       Nemáš přiřazený žádný projekt, do kterého bys mohl vykazovat.
+      Napiš <a href="mailto:${esc(CONTACT)}">${esc(CONTACT)}</a>, ať tě na projekt přidá.
     </div>`;
     return;
   }
@@ -322,11 +330,12 @@ async function renderForm(view, email) {
         <textarea class="input ts-note" id="ts-note" rows="4" placeholder="Co se dělalo…"></textarea>
       </label>
     </div>
-    <div class="ts-actions">
+    <div class="form-actions">
+      <span class="form-actions-gap"></span>
+      <span id="ts-msg" class="form-msg"></span>
       <button id="ts-save" class="btn btn-primary">Uložit výkaz</button>
-      <span id="ts-msg" class="ts-msg"></span>
     </div>
-    <h2 class="ts-section">Zapsáno k tomuhle dni</h2>
+    <h2 class="section-head">Zapsáno k tomuhle dni</h2>
     <div id="ts-day"><div class="loading">Načítám…</div></div>`;
 
   const dateInput = view.querySelector('#ts-date');
@@ -350,7 +359,7 @@ async function renderForm(view, email) {
 
   dateInput.addEventListener('change', () => loadDay(view, email, dateInput.value));
 
-  view.querySelector('#ts-save').addEventListener('click', async () => {
+  const ulozit = async () => {
     const hoursInput = view.querySelector('#ts-hours');
     const noteInput = view.querySelector('#ts-note');
 
@@ -364,19 +373,20 @@ async function renderForm(view, email) {
     });
 
     if (!entry) {
-      msg.textContent = 'Vyplň datum a hodiny (víc než nula).';
-      msg.className = 'ts-msg error';
+      flash(msg, 'Vyplň datum a hodiny (víc než nula).', 'error');
       return;
     }
 
     // Projekt a datum necháváme — obvykle se zapisuje víc věcí za sebou.
     hoursInput.value = '';
     noteInput.value = '';
-    msg.textContent = 'Uloženo.';
-    msg.className = 'ts-msg ts-msg-ok';
+    flash(msg, 'Uloženo.');
     hoursInput.focus();
     loadDay(view, email, dateInput.value);
-  });
+  };
+
+  wireKeys(view, { submit: ulozit });
+  view.querySelector('#ts-save').addEventListener('click', ulozit);
 
   loadDay(view, email, dateInput.value);
 }
@@ -443,17 +453,17 @@ export function inRange(date, [from, to]) {
 
 function renderList(view, email) {
   view.innerHTML = `
-    <div class="ts-filters">
+    <div class="filter-bar">
       ${RANGES.map((r) =>
-        `<button class="btn ts-filter${r.id === DEFAULT_RANGE ? ' active' : ''}" data-range="${r.id}">${r.label}</button>`
+        `<button class="btn filter${r.id === DEFAULT_RANGE ? ' active' : ''}" data-range="${r.id}">${r.label}</button>`
       ).join('')}
     </div>
     <div id="ts-list"><div class="loading">Načítám…</div></div>`;
 
-  view.querySelector('.ts-filters').addEventListener('click', (e) => {
+  view.querySelector('.filter-bar').addEventListener('click', (e) => {
     const range = e.target.dataset.range;
     if (!range) return;
-    view.querySelectorAll('.ts-filter').forEach((b) => b.classList.toggle('active', b === e.target));
+    view.querySelectorAll('.filter').forEach((b) => b.classList.toggle('active', b === e.target));
     loadList(view, email, range);
   });
 
@@ -497,8 +507,8 @@ async function loadList(view, email, range, editingId = null) {
               <input class="input ts-input-num" data-field="hours" type="number" min="0" step="0.25" value="${esc(e.hours)}">
               <select data-field="kind">${kindOptions(e.kind)}</select>
               <input class="input ts-edit-note" data-field="note" value="${esc(e.note || '')}" placeholder="Popis">
-              <button class="btn btn-primary" data-act="save">Uložit</button>
               <button class="btn" data-act="cancel">Zrušit</button>
+              <button class="btn btn-primary" data-act="save">Uložit změny</button>
             </div>
           </td>
         </tr>`);
@@ -523,37 +533,46 @@ async function loadList(view, email, range, editingId = null) {
     <div class="ts-sum muted">
       ${entries.length} výkazů · ${esc(fmtHours(totalHours))} h · ${esc(formatMoney(totalCost))}
     </div>
-    <table class="table ts-table">
+    <div class="table-scroll"><table class="table ts-table">
       <thead>
         <tr><th>Datum</th><th>Projekt</th><th>Typ</th><th class="ts-num">Hodiny</th><th>Popis</th><th></th></tr>
       </thead>
       <tbody>${rows.join('')}</tbody>
-    </table>`;
+    </table></div>`;
+
+  const ulozitRadek = async (row) => {
+    const get = (field) => row.querySelector(`[data-field="${field}"]`).value;
+    await updateEntry(row.dataset.id, {
+      date: get('date'),
+      project_id: get('project_id'),
+      hours: get('hours'),
+      kind: get('kind'),
+      note: get('note').trim(),
+    });
+    loadList(view, email, range);
+  };
+
+  // Klávesy se navěšují na editovaný řádek, ne na celou tabulku — Enter
+  // v jiném řádku nemá co ukládat.
+  const editing = el.querySelector('tr.ts-editing');
+  if (editing) {
+    wireKeys(editing, {
+      submit: () => ulozitRadek(editing),
+      cancel: () => loadList(view, email, range),
+    });
+  }
 
   el.onclick = async (e) => {
     const act = e.target.dataset.act;
     if (!act) return;
     const row = e.target.closest('tr');
-    const id = row.dataset.id;
 
-    if (act === 'edit') { loadList(view, email, range, id); return; }
+    if (act === 'edit') { loadList(view, email, range, row.dataset.id); return; }
     if (act === 'cancel') { loadList(view, email, range); return; }
-
-    if (act === 'save') {
-      const get = (field) => row.querySelector(`[data-field="${field}"]`).value;
-      await updateEntry(id, {
-        date: get('date'),
-        project_id: get('project_id'),
-        hours: get('hours'),
-        kind: get('kind'),
-        note: get('note').trim(),
-      });
-      loadList(view, email, range);
-      return;
-    }
+    if (act === 'save') { await ulozitRadek(row); return; }
 
     if (!confirm('Smazat tenhle výkaz?')) return;
-    await deleteEntry(id);
+    await deleteEntry(row.dataset.id);
     loadList(view, email, range);
   };
 }

@@ -4,7 +4,7 @@
 // Řádek je jen ke čtení; kliknutím se pod ním rozbalí panel s poli, notes
 // a tlačítkem Uložit změny. Stavová tlačítka se aplikují hned.
 
-import { esc, formatDate, formatMoney, formatMoneyShort } from '../../util.js';
+import { esc, formatDate, formatMoney, formatMoneyShort, wireKeys, flash } from '../../util.js';
 import {
   getOpps, createOpp, updateOpp, setStatus, deleteOpp, CLOSED, STATUS_LABEL,
 } from './store.js';
@@ -52,7 +52,7 @@ async function tileInfo() {
   return { badge: formatMoneyShort(total) };
 }
 
-async function load(mount, archive, { openId = null } = {}) {
+async function load(mount, archive, { openId = null, flashText = '' } = {}) {
   const body = mount.querySelector('#opp-body');
   const sumEl = mount.querySelector('#opp-sum');
 
@@ -70,7 +70,7 @@ async function load(mount, archive, { openId = null } = {}) {
 
   if (openId) {
     const row = body.querySelector(`tr[data-id="${openId}"]`);
-    if (row) toggleRow(row, mount, archive);
+    if (row) toggleRow(row, mount, archive, flashText);
   }
 }
 
@@ -114,7 +114,7 @@ function renderTable(body, opps, archive, mount) {
     </tr>`).join('');
 
   body.innerHTML = `
-    <table class="table opp-table">
+    <div class="table-scroll"><table class="table opp-table">
       <thead>
         <tr>
           <th>Projekt</th><th>Kontakt</th><th class="opp-value">EST hodnota</th>
@@ -122,7 +122,7 @@ function renderTable(body, opps, archive, mount) {
         </tr>
       </thead>
       <tbody>${rows}</tbody>
-    </table>`;
+    </table></div>`;
 
   body.querySelector('tbody').addEventListener('click', (e) => {
     const row = e.target.closest('tr.opp-row');
@@ -138,7 +138,7 @@ function preview(notes) {
 
 // ── Rozbalený panel ──
 
-function toggleRow(row, mount, archive) {
+function toggleRow(row, mount, archive, flashText = '') {
   const open = row.nextElementSibling;
   if (open && open.classList.contains('opp-detail')) {
     open.remove();
@@ -152,7 +152,7 @@ function toggleRow(row, mount, archive) {
 
   row.classList.add('expanded');
   row.insertAdjacentHTML('afterend', detailHtml());
-  wireDetail(row.nextElementSibling, row, mount, archive);
+  wireDetail(row.nextElementSibling, row, mount, archive, flashText);
 }
 
 /** Prázdný panel; hodnoty do něj doplní wireDetail() z dat. */
@@ -160,6 +160,7 @@ function detailHtml() {
   return `
     <tr class="opp-detail">
       <td colspan="7">
+        <div class="form-wide">
         <div class="opp-form">
           <label>Projekt<input class="input" data-field="project"></label>
           <label>Kontakt<input class="input" data-field="contact"></label>
@@ -168,11 +169,14 @@ function detailHtml() {
         <label class="opp-notes-label">Notes
           <textarea class="input opp-notes-input" data-field="notes" rows="5"></textarea>
         </label>
-        <div class="opp-buttons">
-          <button class="btn btn-primary" data-act="save">Uložit změny</button>
-          <span class="opp-buttons-gap"></span>
-          <span class="opp-status-actions"></span>
+        <div class="form-actions">
           <button class="btn btn-danger" data-act="delete">Smazat</button>
+          <span class="form-actions-gap"></span>
+          <span class="form-msg"></span>
+          <span class="opp-status-actions"></span>
+          <button class="btn" data-act="close">Zrušit</button>
+          <button class="btn btn-primary" data-act="save">Uložit změny</button>
+        </div>
         </div>
       </td>
     </tr>`;
@@ -186,7 +190,7 @@ function statusButtons(status) {
   return btn('open', 'Vrátit do pipeline');   // won / lost
 }
 
-async function wireDetail(detail, row, mount, archive) {
+async function wireDetail(detail, row, mount, archive, flashText = '') {
   const id = row.dataset.id;
 
   // Hodnoty bereme z dat, ne z textu v buňkách — formátovaná čísla a zkrácené
@@ -199,23 +203,30 @@ async function wireDetail(detail, row, mount, archive) {
   detail.querySelector('[data-field="est_value"]').value = opp.est_value ?? '';
   detail.querySelector('[data-field="notes"]').value = opp.notes || '';
   detail.querySelector('.opp-status-actions').innerHTML = statusButtons(opp.status);
+  if (flashText) flash(detail.querySelector('.form-msg'), flashText);
+
+  const ulozit = async () => {
+    const value = detail.querySelector('[data-field="est_value"]').value.trim();
+    const number = value === '' ? null : Number(value);
+    await updateOpp(id, {
+      project: detail.querySelector('[data-field="project"]').value,
+      contact: detail.querySelector('[data-field="contact"]').value,
+      est_value: Number.isNaN(number) ? null : number,
+      notes: detail.querySelector('[data-field="notes"]').value,
+    });
+    await load(mount, archive, { openId: id, flashText: 'Uloženo.' });
+  };
+
+  const zavrit = () => toggleRow(row, mount, archive);
+
+  wireKeys(detail, { submit: ulozit, cancel: zavrit });
 
   detail.addEventListener('click', async (e) => {
     const act = e.target.dataset.act;
     if (!act) return;
 
-    if (act === 'save') {
-      const value = detail.querySelector('[data-field="est_value"]').value.trim();
-      const number = value === '' ? null : Number(value);
-      await updateOpp(id, {
-        project: detail.querySelector('[data-field="project"]').value,
-        contact: detail.querySelector('[data-field="contact"]').value,
-        est_value: Number.isNaN(number) ? null : number,
-        notes: detail.querySelector('[data-field="notes"]').value,
-      });
-      await load(mount, archive, { openId: id });
-      return;
-    }
+    if (act === 'save') { await ulozit(); return; }
+    if (act === 'close') { zavrit(); return; }
 
     if (act === 'delete') {
       if (!confirm('Smazat tuhle příležitost?')) return;

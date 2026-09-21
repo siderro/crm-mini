@@ -144,10 +144,44 @@ create policy moje_vec_write on public.moje_vec
 
 Pomocné funkce už existují: `current_email()`, `is_domain_user()`,
 `is_superadmin()`, `can_read_module()`, `can_edit_module()`, `project_level()`,
-`project_is_active()`.
+`project_is_active()`, `my_rank()`, `role_rank()`, `stored_modules()`,
+`stored_role()`.
 
 Novou politiku doplň do `supabase/tests/rls.sql`. Test, který se nepíše zároveň
 s politikou, se nenapíše nikdy.
+
+### Omezuje se `as restrictive`, ne další politikou
+
+**Permisivní politiky se slučují přes OR.** Přidat vedle existující `for all`
+užší `for delete` proto neomezí vůbec nic — naopak přidá další povolenou cestu.
+Vypadá to jako zámek a je to dveře navíc.
+
+```sql
+create policy projects_delete_superadmin on public.projects
+  as restrictive for delete to authenticated
+  using (public.is_superadmin());
+```
+
+Restriktivní politika se přidává přes AND: projde jen ten, koho pustí **obě**.
+
+### Funkce čtoucí `app_users` musí být `security definer`
+
+Politika nad `app_users` se na ně ptá; bez obejití RLS uvnitř by vznikla
+nekonečná rekurze. Platí to pro `stored_modules()`, `stored_role()`,
+`module_level()` i `my_rank()`.
+
+### Co člověk nesmí přepsat sám, se musí **připnout**
+
+`app_users_touch_self` pouští vlastní řádek kvůli `last_login`. Každý sloupec,
+který je právem, se v `with check` musí porovnat s uloženou hodnotou — jinak
+si ho člověk nastaví sám. Takhle je připnutá `modules` i `role`:
+
+```sql
+and role is not distinct from public.stored_role(email)
+```
+
+`is not distinct from`, ne `=`: u `NULL` by rovnost vrátila `NULL` a check by
+neprošel nikomu bez role — tedy každému novému člověku.
 
 ---
 
@@ -185,6 +219,53 @@ srozumitelnou hlášku místo bílé stránky — a moduly jde naimportovat v te
   tam, kde jde o jednu hodnotu.
 - **Hidden interactions ne.** Co má jít udělat, má být vidět — s jedinou výjimkou
   tlačítek na hover u hustých seznamů, kde by jinak zabírala víc místa než obsah.
+
+### Kde je tlačítko
+
+Jedno předvídatelné místo ve všech editačních panelech:
+
+```
+[Smazat]  ...........  [hláška]  [Zrušit]  [Uložit změny]
+```
+
+- **Primární vpravo dole** — konec formuláře, kam oko doputuje.
+- **Destruktivní vlevo**, oddělená pružnou mezerou `.form-actions-gap`.
+- **Panel má `.form-wide`**, jinak pravý roh uteče přes celou obrazovku
+  a tlačítko skončí 900 px od posledního pole.
+- Delší než okno → `position: sticky; bottom: 0` na `.form-actions`.
+
+### Uložení se musí ozvat
+
+`flash(el, 'Uloženo.')` do `<span class="form-msg">` v řádku akcí. Bez toho
+se po uložení jen překreslí tabulka — a když se viditelně nic nezmění
+(oprava překlepu), nejde poznat, jestli to prošlo. Chyba zůstane, potvrzení
+po chvíli zmizí samo.
+
+**Selhání nesmí být tiché.** `if (!saved) return;` je nejhorší možné chování:
+klik, a žádná reakce. Když store vrátí `null`, musí se to říct.
+
+### Klávesnice
+
+`wireKeys(scope, { submit, cancel })` — Enter v jednořádkovém poli potvrdí,
+v textarea až Cmd/Ctrl+Enter (Enter tam dělá nový řádek a musí ho dělat dál),
+Esc zruší. Tlačítka zůstávají vidět; klávesnice je zkratka navíc, ne náhrada,
+takže to neporušuje pravidlo „hidden interactions ne".
+
+### Sdílené prvky, ne modulové kopie
+
+`.lead`, `.filter-bar`, `.filter`, `.summary`, `.section-head`, `.note`,
+`.form-actions`, `.form-msg`, `.table-scroll`. Dřív měl každý z nich v každém
+modulu vlastní třídu s trochu jiným číslem — proto aplikace působila nestejně,
+aniž šlo ukázat na chybu. **Nová `.<modul>-lead` je vždycky chyba.**
+
+Tóny jsou globální: `.tone-muted`, `.tone-warn`, `.tone-over`. Třída vázaná
+jen na jednoho rodiče znamená, že jinde tiše nic neudělá.
+
+### Tabulka patří do `.table-scroll`
+
+Sloupce mají `nowrap`, takže na užším okně přetečou ven ze stránky. Scroll
+patří do obalu, ne na `table` samotnou — `display: block` by rozpojilo šířky
+hlavičky a těla.
 
 Styly jsou v jednom `styles.css`, tříděné po modulech, s proměnnými v `:root`.
 Žádný CSS framework.

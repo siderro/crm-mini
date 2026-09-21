@@ -17,10 +17,13 @@ export const devdata = {
     mount.innerHTML = `
       <div class="dev">
         <div class="page-head"><h1>Testovací data</h1></div>
-        <p class="muted dev-lead">
-          Vygeneruje pět vymyšlených lidí, deset projektů, sazby, roční historii
-          výkazů, příležitosti, wiki stránky a úkoly. Vymyšlení lidé mají e-mail
-          s předponou <code>test.</code>, ať je v seznamech poznáš.
+        <p class="lead">
+          Vygeneruje pět vymyšlených lidí s rolemi, deset projektů, sazby, roční
+          historii výkazů, pravidelné i jednorázové náklady, příležitosti, wiki
+          stránky a úkoly. Vymyšlení lidé mají e-mail s předponou
+          <code>test.</code>, ať je v seznamech poznáš.
+          Uzavřeným projektům se na závěr zmrazí čísla, aby na nich šlo ověřit,
+          že se zisk uzavřením opravdu zastaví.
         </p>
         <div id="dev-body"><div class="loading">Načítám…</div></div>
       </div>`;
@@ -38,7 +41,9 @@ const LABELS = {
   prilezitosti: 'příležitostí',
   stranky: 'wiki stránek',
   ukoly: 'úkolů',
+  naklady: 'nákladů',
   prirazeni: 'přiřazení',
+  snapshoty: 'zmrazených uzávěrek',
 };
 
 /** Z počtů od databáze udělá čitelný výčet. */
@@ -55,10 +60,10 @@ async function load(body, message = '') {
 
   body.innerHTML = `
     ${message}
-    <div class="pm-summary dev-sum">
-      <div class="pm-cell">
-        <span class="pm-cell-label">V systému je</span>
-        <span class="pm-cell-value">${total ? esc(summary(counts)) : 'žádná testovací data'}</span>
+    <div class="summary">
+      <div class="summary-cell">
+        <span class="summary-label">V systému je</span>
+        <span class="summary-value">${total ? esc(summary(counts)) : 'žádná testovací data'}</span>
       </div>
     </div>
     <div class="dev-actions">
@@ -67,18 +72,21 @@ async function load(body, message = '') {
       </button>
       ${total ? `<button id="dev-wipe" class="btn btn-danger">Smazat testovací data</button>` : ''}
     </div>
-    ${total ? `<p class="muted dev-note">
+    ${total ? `<p class="note">
       Generování začíná vždycky z čista — stávající testovací data nejdřív smaže,
       ať se nenaskládají na sebe.
     </p>` : ''}
-    <h2 class="dev-head">Čeho se mazání nedotkne</h2>
-    <p class="muted dev-note">
-      Opravdových lidí ani jejich výkazů, sazeb, projektů, příležitostí, wiki
-      a úkolů. Maže se výhradně to, co nese příznak <code>is_dummy</code>, takže
-      na tom nezáleží, jak se kdo jmenuje.
+    <h2 class="section-head">Čeho se mazání nedotkne</h2>
+    <p class="note">
+      Opravdových lidí ani jejich výkazů, sazeb, projektů, nákladů, příležitostí,
+      wiki a úkolů. Maže se výhradně to, co nese příznak <code>is_dummy</code>,
+      takže na tom nezáleží, jak se kdo jmenuje.
     </p>`;
 
   body.querySelector('#dev-gen').addEventListener('click', async () => {
+    // Generování začíná mazáním stávající sady — je to destruktivní akce
+    // a musí se ptát stejně jako samotné Smazat.
+    if (total && !confirm('Vygenerovat znovu? Stávající testovací data se nejdřív smažou. Opravdových dat se to nedotkne.')) return;
     await run(body, 'Generuju… u roční historie výkazů to chvíli trvá.', async () => {
       const result = await generate();
       return `<div class="dev-msg dev-msg-ok">Vygenerováno: ${esc(summary(result))}.</div>`;
@@ -104,6 +112,6 @@ async function run(body, progress, action) {
     const message = await action();
     await load(body, message);
   } catch (err) {
-    await load(body, `<div class="error">Nepovedlo se: ${esc(err.message)}</div>`);
+    await load(body, `<div class="error">Chyba: ${esc(err.message)}</div>`);
   }
 }

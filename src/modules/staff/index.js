@@ -13,7 +13,7 @@
 // náklad s nulovým výnosem a jsou vidět zvlášť, aby nekazily marži klientské
 // práce, ale ani se neztratily.
 
-import { esc, guard } from '../../util.js';
+import { esc, guard, formatMoneyShort } from '../../util.js';
 import { listUsers } from '../access/store.js';
 import { rateResolver } from '../rates/store.js';
 import { getEntries } from '../timesheet/store.js';
@@ -27,24 +27,25 @@ export const staff = {
   id: 'staff',
   label: 'Ziskovost lidí',
   desc: 'Kdo kolik vydělal a kolik stál',
-  superadminOnly: true,    // mzdové údaje se nerozdávají
+  superadminOnly: true,
+  tileInfo,    // mzdové údaje se nerozdávají
   render(mount) {
     mount.innerHTML = `
       <div class="stf">
         <div class="page-head"><h1>Ziskovost lidí</h1></div>
-        <p class="muted stf-lead">
+        <p class="lead">
           Prodaná hodina proti nákladu. Prodejní cena hodiny = cena projektu ÷ odhad hodin,
           u PM částka na PM ÷ odpracované PM hodiny. Přeteklý projekt tedy sráží přínos.
         </p>
         <div class="stf-controls">
-          <div class="stf-filters">
+          <div class="filter-bar">
             ${RANGES.map((r) =>
-              `<button class="btn stf-filter${r.id === DEFAULT_RANGE ? ' active' : ''}" data-range="${r.id}">${r.label}</button>`
+              `<button class="btn filter${r.id === DEFAULT_RANGE ? ' active' : ''}" data-range="${r.id}">${r.label}</button>`
             ).join('')}
           </div>
-          <div class="stf-filters">
+          <div class="filter-bar">
             ${VIEWS.map((v) =>
-              `<button class="btn stf-view${v.id === DEFAULT_VIEW ? ' active' : ''}" data-view="${v.id}">${v.label}</button>`
+              `<button class="btn filter${v.id === DEFAULT_VIEW ? ' active' : ''}" data-view="${v.id}">${v.label}</button>`
             ).join('')}
           </div>
         </div>
@@ -62,10 +63,10 @@ export const staff = {
 
       if (r) {
         range = r;
-        mount.querySelectorAll('.stf-filter').forEach((b) => b.classList.toggle('active', b === e.target));
+        mount.querySelectorAll('.filter').forEach((b) => b.classList.toggle('active', b === e.target));
       } else {
         view = v;
-        mount.querySelectorAll('.stf-view').forEach((b) => b.classList.toggle('active', b === e.target));
+        mount.querySelectorAll('.filter').forEach((b) => b.classList.toggle('active', b === e.target));
       }
       guard(body, () => load(body, range, view));
     });
@@ -109,6 +110,26 @@ async function collect(rangeId) {
 
 /** Rozpad jednoho výkazu na náklad a prodanou hodnotu. */
 
+/** Dlaždice na hubu: přínos lidí za tenhle rok. */
+async function tileInfo() {
+  const data = await collect('year');
+  if (!data.entries.length) return null;
+
+  const total = blank();
+  for (const e of data.entries) {
+    const { rate, sold, billable } = priceEntry(e, data.byId, data.rates, data.rateOn);
+    add(total, e, rate, sold, billable);
+  }
+
+  const { profit, margin } = finish(total);
+  return {
+    badge: formatMoneyShort(profit),
+    alert: margin != null && margin < 0
+      ? { text: 'prodaná hodina je pod nákladem', tone: 'over' }
+      : null,
+  };
+}
+
 // ── Pohledy ──
 
 async function load(body, rangeId, view) {
@@ -131,10 +152,10 @@ async function load(body, rangeId, view) {
 
 function summary(total) {
   const cell = (label, value, tone = '') =>
-    `<div class="pm-cell"><span class="pm-cell-label">${label}</span><span class="pm-cell-value ${tone}">${value}</span></div>`;
+    `<div class="summary-cell"><span class="summary-label">${label}</span><span class="summary-value ${tone}">${value}</span></div>`;
 
   return `
-    <div class="pm-summary stf-sum">
+    <div class="summary">
       ${cell('Odpracováno', `${esc(fmtHours(total.hours))} h`)}
       ${cell('Prodáno', esc(czk(total.sold)))}
       ${cell('Náklad', esc(czk(total.cost)))}
@@ -156,7 +177,7 @@ function notes(total) {
       za ${czk(total.internalCost)}. Nic neprodávají, do marže nevstupují.`);
   }
   return out.length
-    ? `<p class="muted stf-note">${out.map(esc).join('<br>')}</p>`
+    ? `<p class="note">${out.map(esc).join('<br>')}</p>`
     : '';
 }
 
@@ -178,7 +199,7 @@ function renderPeople(body, { users, entries, byId, rates, rateOn }) {
 
   body.innerHTML = `
     ${summary(finish(total))}
-    <table class="table stf-table">
+    <div class="table-scroll"><table class="table stf-table">
       <thead>
         <tr>
           <th>Člověk</th><th class="stf-num">Hodin</th>
@@ -200,7 +221,7 @@ function renderPeople(body, { users, entries, byId, rates, rateOn }) {
             <td class="stf-num">${r.hours ? esc(czk(r.sold / r.hours)) + '/h' : '—'}</td>
           </tr>`).join('')}
       </tbody>
-    </table>
+    </table></div>
     ${notes(total)}`;
 }
 
@@ -227,7 +248,7 @@ function renderTime(body, { entries, byId, rates, rateOn }) {
 
   body.innerHTML = `
     ${summary(finish(total))}
-    <table class="table stf-table">
+    <div class="table-scroll"><table class="table stf-table">
       <thead>
         <tr>
           <th>Měsíc</th><th class="stf-num">Hodin</th>
@@ -247,6 +268,6 @@ function renderTime(body, { entries, byId, rates, rateOn }) {
               r.margin == null ? '—' : esc(Math.round(r.margin)) + ' %'}</td>
           </tr>`).join('')}
       </tbody>
-    </table>
+    </table></div>
     ${notes(total)}`;
 }

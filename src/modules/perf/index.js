@@ -23,26 +23,27 @@ export const perf = {
   label: 'Výkon',
   desc: 'Kolik hodin máme a kolik děláme',
   superadminOnly: true,
+  tileInfo,
   render(mount) {
     mount.innerHTML = `
       <div class="perf">
         <div class="page-head"><h1>Výkon</h1></div>
-        <p class="muted perf-lead">
+        <p class="lead">
           Kapacita je počet hodin za měsíc slíbený lidem na paušálu. Hodinoví lidé
           do kapacity nevstupují — odvedená práce se u nich počítá, slíbená ne.
         </p>
-        <div class="perf-filters">
+        <div class="filter-bar">
           ${RANGES.map((r) =>
-            `<button class="btn perf-filter${r.id === DEFAULT_RANGE ? ' active' : ''}" data-range="${r.id}">${r.label}</button>`
+            `<button class="btn filter${r.id === DEFAULT_RANGE ? ' active' : ''}" data-range="${r.id}">${r.label}</button>`
           ).join('')}
         </div>
         <div id="perf-body"><div class="loading">Načítám…</div></div>
       </div>`;
 
-    mount.querySelector('.perf-filters').addEventListener('click', (e) => {
+    mount.querySelector('.filter-bar').addEventListener('click', (e) => {
       const range = e.target.dataset.range;
       if (!range) return;
-      mount.querySelectorAll('.perf-filter').forEach((b) => b.classList.toggle('active', b === e.target));
+      mount.querySelectorAll('.filter').forEach((b) => b.classList.toggle('active', b === e.target));
       load(mount.querySelector('#perf-body'), range);
     });
 
@@ -54,6 +55,38 @@ export const perf = {
  * Měsíce, které přehled ukazuje. Kouká se zpátky — je to odvedená práce,
  * ne plán. „Tento rok" proto končí aktuálním měsícem.
  */
+
+/** Dlaždice na hubu: jak jsme tenhle měsíc využití proti slíbené kapacitě. */
+async function tileInfo() {
+  const [users, entries] = await Promise.all([listUsers(), getEntries()]);
+  const recordOn = await rateRecordResolver();
+
+  const now = new Date();
+  const mesic = new Date(now.getFullYear(), now.getMonth(), 1);
+  const key = monthKey(mesic);
+  const konec = lastDayIso(mesic);
+
+  let kapacita = 0;
+  for (const u of users) {
+    const rate = recordOn(u.email, konec);
+    if (rate?.type === 'monthly') kapacita += Number(rate.monthly_hours) || 0;
+  }
+
+  const odvedeno = entries
+    .filter((e) => e.date.slice(0, 7) === key)
+    .reduce((sum, e) => sum + e.hours, 0);
+
+  if (!odvedeno && !kapacita) return null;
+
+  const vyuziti = pct(odvedeno, kapacita);
+  return {
+    badge: `${fmtHours(odvedeno)} h`,
+    // Nízké využití uprostřed měsíce nic neznamená — měsíc ještě neskončil.
+    alert: vyuziti != null && vyuziti > 110
+      ? { text: `využití ${vyuziti} % — děláme víc, než máme slíbeno`, tone: 'warn' }
+      : null,
+  };
+}
 
 async function load(body, rangeId) {
   let users, entries, projects, recordOn;
@@ -105,14 +138,14 @@ async function load(body, rangeId) {
   }), { capacity: 0, tracked: 0, client: 0, internal: 0 });
 
   const cell = (label, value, tone = '') =>
-    `<div class="pm-cell"><span class="pm-cell-label">${label}</span><span class="pm-cell-value ${tone}">${value}</span></div>`;
+    `<div class="summary-cell"><span class="summary-label">${label}</span><span class="summary-value ${tone}">${value}</span></div>`;
 
   const use = pct(total.tracked, total.capacity);
   const bill = pct(total.client, total.tracked);
 
   body.innerHTML = `
-    <div class="pm-summary perf-sum">
-      ${cell('Natrackováno', `<strong>${esc(fmtHours(total.tracked))} h</strong>`)}
+    <div class="summary">
+      ${cell('Odpracováno', `<strong>${esc(fmtHours(total.tracked))} h</strong>`)}
       ${cell('Kapacita paušálů', total.capacity ? `${esc(fmtHours(total.capacity))} h` : '—')}
       ${cell('Využití', use == null ? '—' : `${use} %`, use != null && use < 70 ? 'tone-over' : '')}
       ${cell('Klientské', total.tracked ? `${esc(fmtHours(total.client))} h · ${bill} %` : '—')}

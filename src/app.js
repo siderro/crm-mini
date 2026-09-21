@@ -189,7 +189,7 @@ window.addEventListener('unhandledrejection', (e) => {
     bar.className = 'app-error';
     document.body.appendChild(bar);
   }
-  bar.innerHTML = `<span>Něco se nepovedlo: ${esc(message)}</span>
+  bar.innerHTML = `<span>Chyba: ${esc(message)}</span>
     <button class="btn" id="app-error-close">Zavřít</button>`;
   bar.querySelector('#app-error-close').addEventListener('click', () => bar.remove());
 });

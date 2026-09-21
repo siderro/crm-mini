@@ -161,7 +161,7 @@ async function renderList(mount, canEdit) {
   });
 
   body.innerHTML = `
-    <table class="table pm-table">
+    <div class="table-scroll"><table class="table pm-table">
       <thead>
         <tr>
           <th>Projekt</th><th class="pm-meter">Termín</th>
@@ -170,7 +170,7 @@ async function renderList(mount, canEdit) {
         </tr>
       </thead>
       <tbody>${rows.join('')}</tbody>
-    </table>`;
+    </table></div>`;
 
   body.querySelector('tbody').addEventListener('click', (e) => {
     const row = e.target.closest('tr.pm-row');
@@ -193,16 +193,16 @@ function formFields(p = {}) {
           ${BILLING.map((b) => `<option value="${b}"${b === billing ? ' selected' : ''}>${BILLING_LABEL[b]}</option>`).join('')}
         </select>
       </label>
-      <label>Estimated začátek
+      <label>Plánovaný začátek
         <input class="input" data-field="est_start" type="date" value="${v('est_start')}">
       </label>
-      <label>Estimated konec
+      <label>Plánovaný konec
         <input class="input" data-field="est_end" type="date" value="${v('est_end')}">
       </label>
-      <label>Estimated hodiny (design)
+      <label>Odhad hodin (design)
         <input class="input pm-input-num" data-field="est_hours" type="number" min="0" step="1" value="${v('est_hours')}">
       </label>
-      <label>Estimated cena projektu (Kč)
+      <label>Cena projektu (Kč)
         <input class="input pm-input-num" data-field="est_price" type="number" min="0" step="1" value="${v('est_price')}">
       </label>
       <label>Project management (Kč)
@@ -249,7 +249,7 @@ function personPicker(users, taken) {
 }
 
 function teamListHtml(team, editable) {
-  if (!team.length) return `<div class="empty-state">Zatím nikdo.</div>`;
+  if (!team.length) return `<div class="empty-state">Zatím nikdo. Přidej lidi výběrem pod seznamem — kdo je na projektu, může do něj vykazovat.</div>`;
 
   return team.map((t) => `
     <div class="pm-member" data-email="${esc(t.email)}">
@@ -284,14 +284,15 @@ async function renderCreate(mount, canEdit) {
     <div class="pm">
       <div class="page-head"><h1>Nový projekt</h1></div>
       ${subnav('new', true)}
-      ${formFields()}
-      <h2 class="pm-section">Tým</h2>
+      <div class="form-wide">${formFields()}</div>
+      <h2 class="section-head">Tým</h2>
       <div id="pm-team"></div>
-      <div class="pm-actions">
-        <button id="pm-save" class="btn btn-primary">Založit projekt</button>
+      <div class="form-actions form-wide">
+        <span class="form-actions-gap"></span>
+        <span class="form-msg" id="pm-error"></span>
         <a href="#/pm" class="btn">Zrušit</a>
+        <button id="pm-save" class="btn btn-primary">Založit projekt</button>
       </div>
-      <div id="pm-error"></div>
     </div>`;
 
   draw();
@@ -310,17 +311,19 @@ async function renderCreate(mount, canEdit) {
     }
   });
 
-  mount.querySelector('#pm-save').addEventListener('click', async () => {
+  const zalozit = async () => {
     const project = await addProject(readForm(mount));
     if (!project) {
-      mount.querySelector('#pm-error').innerHTML =
-        `<div class="error">Projekt potřebuje název.</div>`;
+      flash(mount.querySelector('#pm-error'), 'Projekt potřebuje název.', 'error');
       return;
     }
     // Přiřazení z formuláře znamená „může vykazovat".
     for (const t of team) await setMember(project.id, t.email, 'report', t.role);
     location.hash = `#/pm/${project.id}`;
-  });
+  };
+
+  wireKeys(mount, { submit: zalozit, cancel: () => { location.hash = '#/pm'; } });
+  mount.querySelector('#pm-save').addEventListener('click', zalozit);
 }
 
 // ── Detail ──
@@ -352,11 +355,11 @@ async function renderDetail(mount, id, canEdit) {
         </div>` : ''}
       </div>
       <div id="pm-detail"></div>
-      <h2 class="pm-section">Ekonomika</h2>
+      <h2 class="section-head">Ekonomika</h2>
       <div id="pm-econ"><div class="loading">Načítám…</div></div>
-      <h2 class="pm-section">Tým</h2>
+      <h2 class="section-head">Tým</h2>
       <div id="pm-team"></div>
-      <h2 class="pm-section">Výkazy</h2>
+      <h2 class="section-head">Výkazy</h2>
       <div id="pm-entries"><div class="loading">Načítám…</div></div>
     </div>`;
 
@@ -388,14 +391,14 @@ async function renderDetail(mount, id, canEdit) {
 
 function showSummary(mount, p) {
   const cell = (label, value) =>
-    `<div class="pm-cell"><span class="pm-cell-label">${label}</span><span class="pm-cell-value">${value}</span></div>`;
+    `<div class="summary-cell"><span class="summary-label">${label}</span><span class="summary-value">${value}</span></div>`;
 
   mount.querySelector('#pm-detail').innerHTML = `
-    <div class="pm-summary">
+    <div class="summary">
       ${cell('Typ', esc(BILLING_LABEL[p.billing]))}
-      ${cell('Estimated začátek', esc(date(p.est_start)))}
-      ${cell('Estimated konec', esc(date(p.est_end)))}
-      ${cell('Estimated hodiny', p.est_hours == null ? '—' : esc(fmtHours(p.est_hours)) + ' h')}
+      ${cell('Plánovaný začátek', esc(date(p.est_start)))}
+      ${cell('Plánovaný konec', esc(date(p.est_end)))}
+      ${cell('Odhad hodin', p.est_hours == null ? '—' : esc(fmtHours(p.est_hours)) + ' h')}
       ${cell('Cena projektu', esc(money(p.est_price)))}
       ${cell('Project management', esc(money(p.est_pm)))}
       ${cell('SLA', p.est_sla == null ? '—' : esc(formatMoney(p.est_sla)) + '/měs')}
@@ -463,23 +466,30 @@ async function loadEconomics(el, project) {
 function showEdit(mount, project, canEdit) {
   const el = mount.querySelector('#pm-detail');
   el.innerHTML = `
-    ${formFields(project)}
-    <div class="pm-actions">
-      <button id="pm-save" class="btn btn-primary">Uložit změny</button>
-      <button id="pm-cancel" class="btn">Zrušit</button>
-    </div>
-    <div id="pm-error"></div>`;
+    <div class="form-wide">
+      ${formFields(project)}
+      <div class="form-actions">
+        <span class="form-actions-gap"></span>
+        <span class="form-msg" id="pm-error"></span>
+        <button id="pm-cancel" class="btn">Zrušit</button>
+        <button id="pm-save" class="btn btn-primary">Uložit změny</button>
+      </div>
+    </div>`;
 
-  el.querySelector('#pm-cancel').addEventListener('click', () => showSummary(mount, project));
+  const zrusit = () => showSummary(mount, project);
 
-  el.querySelector('#pm-save').addEventListener('click', async () => {
+  const ulozit = async () => {
     const updated = await updateProject(project.id, readForm(el));
     if (!updated) {
-      el.querySelector('#pm-error').innerHTML = `<div class="error">Projekt potřebuje název.</div>`;
+      flash(el.querySelector('#pm-error'), 'Projekt potřebuje název.', 'error');
       return;
     }
     renderDetail(mount, project.id, canEdit);
-  });
+  };
+
+  wireKeys(el, { submit: ulozit, cancel: zrusit });
+  el.querySelector('#pm-cancel').addEventListener('click', zrusit);
+  el.querySelector('#pm-save').addEventListener('click', ulozit);
 }
 
 /** Uzavření se ptá na skutečně fakturovanou cenu a zmrazí čísla. */
@@ -496,20 +506,28 @@ function showClose(mount, project, canEdit) {
         Uzavřením se čísla zmrazí — pozdější změna sazeb je už nepřepíše.
         Do uzavřeného projektu se nedá vykazovat.
       </p>
-      <div class="pm-actions">
-        <button id="pm-close-confirm" class="btn btn-primary">Uzavřít projekt</button>
+      <div class="form-actions">
+        <span class="form-actions-gap"></span>
         <button id="pm-close-cancel" class="btn">Zrušit</button>
+        <button id="pm-close-confirm" class="btn btn-primary">Uzavřít projekt</button>
       </div>
     </div>`;
 
-  el.querySelector('#pm-close-cancel').addEventListener('click', () => showSummary(mount, project));
+  const zrusit = () => showSummary(mount, project);
 
-  el.querySelector('#pm-close-confirm').addEventListener('click', async () => {
+  // Uzavření je nevratné — zmrazí čísla a zakáže vykazování. Proto se ptá,
+  // i když je výstraha vidět nad tlačítkem: text se přehlédne, dialog ne.
+  const uzavrit = async () => {
     const finalPrice = el.querySelector('#pm-final-price').value;
+    if (!confirm('Uzavřít projekt? Čísla se zmrazí a do projektu už nepůjde vykazovat.')) return;
     const stats = await snapshotFor(project, finalPrice);
     await closeProject(project.id, { finalPrice, stats });
     renderDetail(mount, project.id, canEdit);
-  });
+  };
+
+  wireKeys(el, { submit: uzavrit, cancel: zrusit });
+  el.querySelector('#pm-close-cancel').addEventListener('click', zrusit);
+  el.querySelector('#pm-close-confirm').addEventListener('click', uzavrit);
 }
 
 async function loadTeam(mount, project, canEdit) {
@@ -547,7 +565,7 @@ async function loadEntries(el, project) {
   const entries = await getEntries({ projectId: project.id });
 
   if (!entries.length) {
-    el.innerHTML = `<div class="empty-state">Na tenhle projekt zatím nikdo nevykázal.</div>`;
+    el.innerHTML = `<div class="empty-state">Na tenhle projekt zatím nikdo nevykázal. Dokud nejsou hodiny, nejde spočítat spotřeba ani zisk.</div>`;
     return;
   }
 
@@ -572,7 +590,7 @@ async function loadEntries(el, project) {
   }
 
   el.innerHTML = `
-    <table class="table pm-entries-table">
+    <div class="table-scroll"><table class="table pm-entries-table">
       <thead>
         <tr>
           <th>Datum</th><th>Kdo</th><th>Typ</th><th class="pm-num">Hodiny</th>
@@ -580,5 +598,5 @@ async function loadEntries(el, project) {
         </tr>
       </thead>
       <tbody>${rows.join('')}</tbody>
-    </table>`;
+    </table></div>`;
 }

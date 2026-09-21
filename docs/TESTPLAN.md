@@ -170,13 +170,56 @@ TypeError: Failed to fetch |
 | 10.2 | Člověku nastavit paušál 80 000 / 160 h | Ve Výplatách částka 80 000 bez ohledu na hodiny |
 | 10.3 | Témuž člověku vykázat 200 h | Sloupec **Reálně** ukáže ≈ 400 Kč/h, ne 500 |
 | 10.4 | Filtr *Tento rok* | Paušál × počet měsíců od ledna |
-| 10.5 | **Příjmy výhled** | Karty po měsících, faktura 20 dní po konci projektu |
-| 10.6 | Pod čarou v kartě | `3× SLA = …` |
-| 10.7 | Projekt s propadlým termínem fakturace | Blok **„Po termínu fakturace"** červeně nahoře |
+| 10.5 | **Finance výhled** | Dvanáct karet od tohohle měsíce dál, nahoře řádek zdrojů s checkboxy |
+| 10.6 | V kartě měsíce | Příjmy nahoře, čára, výdaje pod ní, vpravo v hlavičce čistý zůstatek |
+| 10.7 | Projekt s propadlým termínem fakturace | Blok **„Po termínu fakturace"** červeně pod kartami |
 | 10.8 | Projekt bez odhadu konce | Je v bloku „Bez odhadu konce", ne tiše pryč |
+| 10.8a | Vypnout zdroj **Fakturace projektů** | Zmizí z karet **i** blok „Po termínu fakturace"; součty se přepočítají |
+| 10.8b | Vypnout všechny zdroje | Řekne „Zapni aspoň jeden", ne prázdná plocha. **Nesmí se samy zase zapnout** |
+| 10.8c | Zapnout **Mzdy (jen paušály)** | Výchozí je vypnutý; po zapnutí ubude zůstatek o součet paušálů |
+| 10.8d | Obnovit stránku | Zapnuté zdroje zůstaly stejné |
+| 10.8e | Měsíc s velkým jednorázovým nákladem | Zůstatek karty je záporný a **červeně** |
 | 10.9 | **Ziskovost lidí** | Nejlepší nahoře; poznámka pod tabulkou o neoceněných a interních hodinách |
 | 10.10 | Přepnout na **V čase** | Měsíce místo lidí, součty sedí |
 | 10.11 | **Výkon** | Kapacita = součet paušálů, využití, klientské vs. interní |
+| 10.12 | **Náklady** → Pravidelné | Prázdný stav poradí, co sem patří |
+| 10.13 | **+ Nová položka**: nájem 30 000, měsíčně | V tabulce „každý měsíc", souhrn nahoře ukáže 30 000 Kč měsíčně |
+| 10.14 | Přidat položku se zaškrtnutou **Roční platba** a měsícem březen | Řádek říká „ročně v březnu"; do měsíčního průměru vstoupí dvanáctinou |
+| 10.15 | Uložit položku bez názvu nebo bez částky | **Ozve se chyba**, nic se neuloží |
+| 10.16 | U pravidelné položky vyplnit **Platí do** v minulosti | Řádek zešedne na „skončilo …", souhrn ji přestane počítat do průměru a přibude „Ukončených" |
+| 10.16a | Dlaždice na hubu | Měsíční číslo sedí se souhrnem v modulu — ukončená položka v něm není |
+| 10.16b | Dlaždice s jednorázovým výdajem do 30 dní | Upozornění je **oranžové**, ne v barvě běžného textu |
+| 10.17 | Záložka **Jednorázové**: oprava auta 30 000 k datu za 14 dní | Dlaždice na hubu přidá řádek „1 jednorázový výdaj do 30 dní" |
+| 10.18 | Rozkliknout řádek, změnit částku, **Uložit změny** | Rozbalený řádek má **šedé pozadí** jako v CRM; tabulka i souhrn se přepočítají |
+| 10.18a | Najet myší na řádek SLA nebo nákladu v kartě měsíce ve Financích | **Neukazuje ruku ani se nepodsvítí** — nikam nevede. Ruku má jen řádek projektu |
+| 10.19 | **Smazat** položku | Zeptá se, pak zmizí |
+
+---
+
+## 10b. Klávesnice a ukládání — napříč aplikací
+
+Tohle se netýká jednoho modulu, projdi to na třech místech.
+
+| | Krok | Co se má stát |
+|---|---|---|
+| 10b.1 | Ruční zápis výkazu: vyplnit hodiny, **Enter** v poli Hodiny | Uloží se, objeví se **„Uloženo."** vedle tlačítka a po chvíli zmizí |
+| 10b.2 | Tamtéž: napsat popis, **Enter** v poli Popis | Udělá **nový řádek**, neuloží |
+| 10b.3 | Tamtéž: **Cmd/Ctrl+Enter** v poli Popis | Uloží |
+| 10b.4 | Rozbalit OPP v CRM, změnit kontakt, **Enter** | Uloží se a ozve se |
+| 10b.5 | Rozbalit OPP, něco přepsat, **Esc** | Panel se zavře, **změna se neuloží** |
+| 10b.6 | To-Do: napsat poznámku, **Enter** | Nový řádek (každý řádek = jedna poznámka) |
+| 10b.7 | To-Do: **Cmd/Ctrl+Enter** | Odloží všechny řádky najednou |
+| 10b.8 | To-Do: kliknout na odloženou poznámku, přepsat, **Esc** | Vrátí se původní text |
+| 10b.9 | Opravit překlep v poznámce nákladu a **Uložit změny** | Ozve se „Uloženo." — i když se v tabulce nic viditelně nezmění |
+| 10b.10 | Nastavení → Přístupy do projektů, přepnout buňku | Nahoře se objeví „Uloženo — jméno: vykazuje" |
+| 10b.11 | Lidé → rozbalit člověka → **Přidat sazbu** s prázdnou částkou | **Ozve se chyba**, ne tiché nic |
+| 10b.12 | Lidé → upravit existující verzi sazby | Uloží se až tlačítkem **Uložit**, ne odkliknutím z pole |
+| 10b.13 | Wiki → Upravit → změnit text → **Zrušit** | Změna se zahodí, text zůstane původní |
+| 10b.14 | Wiki → Upravit → změnit text → **Uložit změny** | Uloží se a vrátí do čtení |
+| 10b.15 | Detail projektu → **Uzavřít projekt** | **Zeptá se** — je to nevratné |
+| 10b.16 | Nastavení → Testovací data → **Vygenerovat znovu** | **Zeptá se** — nejdřív maže |
+| 10b.17 | V libovolném panelu: primární tlačítko je **vpravo dole**, Smazat vlevo | Ve všech modulech stejně |
+| 10b.18 | Zmenšit okno na půlku, projít Projekty, Výplaty, Ziskovost lidí | Tabulka se posouvá **uvnitř sebe**, stránka nikam neuteče |
 
 ---
 
@@ -188,18 +231,31 @@ Potřebuješ druhý účet na `@svejda-goldmann.cz` a druhý prohlížeč (nebo 
 |---|---|---|
 | 11.1 | Kolega se přihlásí | **Čekárna** — žádný modul, vysvětlení, koho má požádat |
 | 11.2 | Ty: Nastavení → Lidé → je v seznamu | Přibyl řádek s dnešním datem |
+| 11.2a | Rozkliknout člověka na širokém okně | **Tři panely vedle sebe** — Role, Moduly, Hodinová sazba. Na užším okně se přeskládají na dva a pak na jeden, formulář sazby se nesmí rozsypat |
 | 11.3 | Zapnout mu **CRM na čtení**, on F5 | Vidí CRM. **Needituje** — žádné „+ Nová OPP", panely jsou jen ke čtení |
+| 11.3a | Nastavit mu roli **Designér** | Moduly se přepíšou předlohou; v řádku je štítek „Designér" |
+| 11.3b | Ručně mu přidat CRM navíc | U role přibude **„(upraveno)"** a tlačítko *Srovnat s rolí* |
+| 11.3c | Kliknout **Srovnat s rolí** | Moduly se vrátí na předlohu, „(upraveno)" zmizí |
 | 11.4 | Přepnout na **editace**, F5 | Teď edituje |
 | 11.5 | Přiřadit ho na projekt jako **vykazuje** | |
 | 11.6 | On: Pracovní výkaz | Projekt je v nabídce, vykáže hodiny |
 | 11.7 | Ty: detail projektu → Výkazy | Jeho výkaz je vidět, se sazbou |
 | 11.8 | On: Můj výkaz | **Vidí jen svoje výkazy**, ne tvoje |
-| 11.9 | On zadá do adresy `#/payroll` | **Odmítne ho to.** Totéž `#/staff`, `#/profit`, `#/people` |
-| 11.10 | On: hub | Dlaždice Výplaty, Příjmy, Ziskovost ani Lidé tam nejsou |
-| 11.11 | Ty: odebrat mu CRM, on F5 | CRM je pryč |
-| 11.12 | Odebrat mu všechno, on F5 | Zpátky v čekárně |
+| 11.8a | On v konzoli: `await sb.from('timesheet').select('*')` | Vrátí **jen jeho řádky**. Tohle je to podstatné — schovat je v UI nestačí |
+| 11.8b | On v konzoli: `await sb.from('projects').select('*')` | Jen projekty, kde je přiřazený |
+| 11.9 | On zadá do adresy `#/payroll` | **Odmítne ho to.** Totéž `#/finance`, `#/costs`, `#/staff`, `#/profit`, `#/people` |
+| 11.10 | On: hub | Dlaždice Výplaty, Finance výhled, Náklady, Ziskovost ani Lidé tam nejsou |
+| 11.10a | On v konzoli: `await sb.from('costs').select('*')` | Prázdno — peníze jsou jen superadminovy |
+| 11.10b | On v konzoli: `await sb.from('app_users').update({role:'admin'}).eq('email', <jeho>)` | **Role se nezmění.** Kdyby ano, je celý model rolí k ničemu |
+| 11.11 | Ty: přepnout mu roli na **Manažer**, on F5 | Teď vidí všechny projekty i cizí výkazy; u cizího nákladu píše „bez sazby", ne nulu |
+| 11.11a | On: v Projektech zkusit **smazat projekt** | Neprojde — mazání je jen superadminovo |
+| 11.11b | On (manažer): u wiki stránky nastavit **Vidí Admin a výš** | Neuloží se a řekne proč — výš, než je sám, ji posunout nemůže |
+| 11.12 | Ty: založit wiki stránku a nastavit jí **Vidí Manažer a výš** | |
+| 11.13 | Přepnout ho zpátky na **Designér**, on F5 | Ta stránka v jeho seznamu **není** |
+| 11.14 | Ty: odebrat mu roli i moduly, on F5 | Zpátky v čekárně |
 
-**Když kterýkoli bod 11.8–11.10 selže, je to bezpečnostní nález, ne kosmetika.**
+**Když kterýkoli bod 11.8–11.13 selže, je to bezpečnostní nález, ne kosmetika.**
+Body s konzolí jsou důležitější než ty s klikáním: UI se dá obejít, RLS ne.
 
 ---
 
@@ -213,10 +269,15 @@ Potřebuješ druhý účet na `@svejda-goldmann.cz` a druhý prohlížeč (nebo 
 | 12.4 | Projekty | Deset projektů, mezi nimi jeden po termínu a jeden s přetečenými hodinami |
 | 12.5 | Výkon | Dvanáct karet s hodinami kolem 110 h na osobu za měsíc |
 | 12.6 | Ziskovost lidí | Všichni mají prodáno, náklad i marži |
+| 12.6a | **Náklady** | Osm pravidelných (z toho dvě roční a jedno ukončené), čtyři jednorázové |
+| 12.6b | **Finance výhled** | Karty mají příjmy i výdaje; měsíc s notebooky je znatelně v mínusu |
+| 12.6c | Lidé | `test.*` mají role — tři designéři, dva manažeři |
+| 12.6d | **Ziskovost projektů** → uzavřený dummy projekt | Má zisk i marži; čísla jsou zmrazená, ne dopočítaná |
+| 12.6e | Témuž člověku změnit sazbu a vrátit se | Zisk uzavřeného projektu **se nezměnil** — tohle je to podstatné |
 | 12.7 | **Vygenerovat znovu** | Počty zůstanou podobné, **nezdvojnásobí se** |
 | 12.8 | **Smazat testovací data** | Potvrzení, pak výčet smazaného |
 | 12.9 | Lidé | `test.*` jsou pryč, **ty a David zůstali** |
-| 12.10 | Tvoje vlastní výkazy a projekty | Zůstaly nedotčené |
+| 12.10 | Tvoje vlastní výkazy, projekty a náklady | Zůstaly nedotčené |
 
 **Krok 12.9 a 12.10 je to podstatné** — ověřuje, že mazání nesáhlo na opravdová data.
 

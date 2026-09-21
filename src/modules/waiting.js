@@ -2,7 +2,10 @@
 // Výchozí stav každého nového člověka.
 
 import { esc, formatDate } from '../util.js';
-import { SUPERADMIN_EMAIL } from '../config.js';
+import { SUPERADMIN_EMAILS } from '../config.js';
+
+// Komu napsat. Superadminů může být víc; pro čekárnu stačí ten první.
+const CONTACT = SUPERADMIN_EMAILS[0];
 
 export function renderWaiting(mount, session, onSignOut) {
   mount.innerHTML = `
@@ -12,7 +15,7 @@ export function renderWaiting(mount, session, onSignOut) {
         <h1>Jsi zaregistrovaný</h1>
         <p>Účet <strong>${esc(session.email)}</strong> je v systému zapsaný,
            ale zatím nemáš zapnutý žádný modul.</p>
-        <p>Napiš <a href="mailto:${esc(SUPERADMIN_EMAIL)}">${esc(SUPERADMIN_EMAIL)}</a>,
+        <p>Napiš <a href="mailto:${esc(CONTACT)}">${esc(CONTACT)}</a>,
            ať ti přístupy zapne.</p>
         <p class="muted">Registrace: ${esc(formatDate(session.registeredAt)) || '—'}</p>
         <button id="gate-sign-out" class="btn">Odhlásit</button>

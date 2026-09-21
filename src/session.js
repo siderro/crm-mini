@@ -1,9 +1,17 @@
 // Kdo je přihlášený a kam smí. Jedno místo, kde se na tuhle otázku odpovídá —
 // router se pak už jen ptá.
+//
+// Dvě nezávislé věci:
+//   · moduleAccess — které obrazovky vidí (mapa { moduleId: 'read' | 'edit' })
+//   · role/rank    — které řádky uvnitř nich uvidí; tuhle otázku ale nakonec
+//                    zodpovídá RLS v databázi, ne tohle. Hodnost je tu proto,
+//                    aby šlo schovat, co by stejně přišlo prázdné.
 
-import { ALLOWED_DOMAIN, SUPERADMIN_EMAIL } from './config.js';
+import { ALLOWED_DOMAIN, SUPERADMIN_EMAILS } from './config.js';
 import { MODULES, MODULE_BY_ID } from './modules/registry.js';
-import { touchUser, getUserAccess } from './modules/access/store.js';
+import { touchUser, getUserAccess, rankOf } from './modules/access/store.js';
+
+const SUPERADMINS = SUPERADMIN_EMAILS.map((e) => e.trim().toLowerCase());
 
 /**
  * Ze Supabase uživatele udělá rozhodnutí:
@@ -17,23 +25,28 @@ export async function buildSession(user) {
   const email = (user?.email || '').trim().toLowerCase();
 
   if (!email.endsWith('@' + ALLOWED_DOMAIN)) {
-    return { email, isSuperadmin: false, moduleAccess: {}, allowedModules: [], registeredAt: null, state: 'denied' };
+    return {
+      email, isSuperadmin: false, role: null, rank: 0,
+      moduleAccess: {}, allowedModules: [], registeredAt: null, state: 'denied',
+    };
   }
 
   const record = await touchUser(email);
-  const isSuperadmin = email === SUPERADMIN_EMAIL.trim().toLowerCase();
+  const isSuperadmin = SUPERADMINS.includes(email);
 
   // Super admin má všechno vždycky — jeho práva se nečtou z dat.
-  const moduleAccess = isSuperadmin
-    ? Object.fromEntries(MODULES.map((m) => [m.id, 'edit']))
+  const access = isSuperadmin
+    ? { modules: Object.fromEntries(MODULES.map((m) => [m.id, 'edit'])), role: null }
     : await getUserAccess(email);
 
-
+  const moduleAccess = access.modules;
   const allowedModules = Object.keys(moduleAccess);
 
   return {
     email,
     isSuperadmin,
+    role: isSuperadmin ? 'superadmin' : access.role,
+    rank: isSuperadmin ? rankOf('superadmin') : rankOf(access.role),
     moduleAccess,
     allowedModules,
     registeredAt: record?.first_login || null,

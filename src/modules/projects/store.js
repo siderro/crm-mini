@@ -103,6 +103,15 @@ export async function closeProject(id, { finalPrice = null, stats = null } = {})
   }).eq('id', id).select().single());
 }
 
+/**
+ * Zmrazí čísla u projektu, který už uzavřený je — bez sahání na `closed_at`.
+ * Používá to generátor testovacích dat: uzavřené dummy projekty jsou uzavřené
+ * k datu v minulosti a přepsat jim ho na dnešek by z nich udělalo nesmysl.
+ */
+export async function saveSnapshot(id, stats) {
+  return unwrap(await sb.from(PROJECTS).update({ final: stats }).eq('id', id).select().single());
+}
+
 /** Vrátí projekt mezi běžící a zahodí zmrazená čísla. */
 export async function reopenProject(id) {
   return unwrap(await sb.from(PROJECTS).update({
@@ -116,7 +125,11 @@ export async function reopenProject(id) {
  * V takovém případě to vyhodí chybu, kterou UI ukáže.
  */
 export async function deleteProject(id) {
-  unwrap(await sb.from(PROJECTS).delete().eq('id', id));
+  // `.select()` vrací smazané řádky. Když je prázdno, politika řádek nepustila
+  // — DELETE v Postgresu takový řádek jen přeskočí, nevyhodí chybu. Bez téhle
+  // kontroly by UI oznámilo „smazáno" a projekt by tam pořád byl.
+  const smazane = unwrap(await sb.from(PROJECTS).delete().eq('id', id).select());
+  if (!smazane.length) throw new Error('Projekt smazat nesmíš — to může jen superadmin.');
 }
 
 // ── Přiřazení lidí ──

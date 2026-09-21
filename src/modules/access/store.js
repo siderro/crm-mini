@@ -4,11 +4,22 @@
 // Uloženo jako mapa { moduleId: level } ve sloupci `modules` (jsonb);
 // modul, který v mapě není, je zamčený.
 //
+// Vedle mapy modulů má člověk `role` ('designer' | 'manager' | 'admin').
+// Role dělá dvě věci: je to **předloha** mapy modulů (viz roles.js) a zároveň
+// **hodnost**, podle které RLS rozhoduje, které řádky uvnitř modulu uvidí.
+// Předloha se materializuje, hodnost platí živě.
+//
 // Backend: Supabase, tabulka app_users. RLS hlídá, že si nikdo nemůže přepsat
-// vlastní práva — při přihlášení si smí posunout jen last_login. Rozdávat
-// práva smí jen superadmin. Kontroly v prohlížeči jsou proti tomu jen kosmetika.
+// vlastní práva ani vlastní roli — při přihlášení si smí posunout jen
+// last_login. Rozdávat práva smí jen superadmin. Kontroly v prohlížeči jsou
+// proti tomu jen kosmetika.
 
 import { sb, unwrap } from '../../supabase.js';
+import { ROLES, ROLE_MODULES } from './roles.js';
+
+// Pojmy rolí a předlohy žijí v roles.js; tady se jen přeposílají, aby volající
+// nemusel vědět, odkud co je.
+export { ROLES, ROLE_LABEL, ROLE_DESC, ROLE_MODULES, rankOf, matchesRole } from './roles.js';
 
 const TABLE = 'app_users';
 
@@ -22,8 +33,13 @@ function normalizeModules(modules) {
   );
 }
 
+/** Role, které nerozumíme, zahodíme — do session nepatří nesmysl. */
+function normalizeRole(role) {
+  return ROLES.includes(role) ? role : null;
+}
+
 function normalize(row) {
-  return { ...row, modules: normalizeModules(row.modules) };
+  return { ...row, modules: normalizeModules(row.modules), role: normalizeRole(row.role) };
 }
 
 /**
@@ -61,12 +77,36 @@ export async function listUsers() {
   return rows.map(normalize);
 }
 
-/** Mapa { moduleId: level } pro daného člověka. Neznámý člověk → prázdno. */
+/**
+ * Práva a role jednoho člověka — { modules, role }. Neznámý člověk → prázdno.
+ * Jedním dotazem: session potřebuje obojí a dvě kola po síti při přihlášení
+ * jsou vidět.
+ */
 export async function getUserAccess(email) {
   const row = unwrap(
-    await sb.from(TABLE).select('modules').eq('email', email).maybeSingle()
+    await sb.from(TABLE).select('modules, role').eq('email', email).maybeSingle()
   );
-  return row ? normalizeModules(row.modules) : {};
+  return {
+    modules: row ? normalizeModules(row.modules) : {},
+    role: row ? normalizeRole(row.role) : null,
+  };
+}
+
+/**
+ * Nastaví roli a **zapíše její předlohu do mapy modulů**. To je ta
+ * materializace: od téhle chvíle je „co tenhle člověk vidí" odpověditelné
+ * pohledem na jeden řádek, a jednotlivé moduly jdou pak ještě doladit.
+ *
+ * `role` = null roli i moduly sebere. Vrací upravený záznam.
+ */
+export async function setUserRole(email, role) {
+  const next = ROLES.includes(role) ? role : null;
+  const modules = next ? { ...ROLE_MODULES[next] } : {};
+
+  const updated = unwrap(
+    await sb.from(TABLE).update({ role: next, modules }).eq('email', email).select().single()
+  );
+  return normalize(updated);
 }
 
 /**
@@ -77,7 +117,7 @@ export async function getUserAccess(email) {
  * a přepínání práv je vzácná operace, kde na jeden dotaz navíc nezáleží.
  */
 export async function setUserModule(email, moduleId, level) {
-  const current = await getUserAccess(email);
+  const { modules: current } = await getUserAccess(email);
 
   if (LEVELS.includes(level)) current[moduleId] = level;
   else delete current[moduleId];

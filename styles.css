@@ -167,8 +167,7 @@ a.tile:hover .tile-badge { color: var(--text-secondary); }
 /* Dole jen to, co vyžaduje pozornost. Prázdné nic nezabírá. */
 .tile-alert { font-size: 12px; }
 .tile-alert:not(:empty) { margin-top: 10px; }
-.tile-alert.tone-muted { color: var(--text-secondary); }
-.tile-alert.tone-over { color: var(--danger); font-weight: 500; }
+/* Tóny dědí z globálních .tone-*; tady se nic nepřebarvuje. */
 .tile-clock {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 26px;
@@ -202,7 +201,11 @@ a.tile-btn:hover { text-decoration: none; }
 
 /* ── Lists / tables ── */
 
-.list-head { margin-bottom: 8px; }
+/* Tabulky mají sloupce s `nowrap`, takže na užším okně přetečou ven ze
+   stránky. Scroll patří do obalu kolem tabulky, ne na celý dokument — a ne
+   na samotnou `table`: `display: block` by rozpojilo šířky hlavičky a těla. */
+.table-scroll { overflow-x: auto; }
+
 .table { width: 100%; border-collapse: collapse; }
 .table th {
   text-align: left;
@@ -257,8 +260,6 @@ a.tile-btn:hover { text-decoration: none; }
 .opp-form label { flex: 1 1 180px; }
 .opp-notes-label { margin-bottom: 12px; }
 .opp-notes-input { resize: vertical; font: inherit; line-height: 1.45; }
-.opp-buttons { display: flex; align-items: center; gap: 8px; }
-.opp-buttons-gap { flex: 1; }
 .opp-status-actions { display: flex; gap: 8px; }
 
 .cell-input, .cell-textarea {
@@ -280,6 +281,88 @@ a.tile-btn:hover { text-decoration: none; }
 .cell-num { text-align: right; }
 .cell-textarea { resize: vertical; min-height: 30px; line-height: 1.4; }
 
+/* ── Sdílené prvky ──
+   Tyhle pět věcí mělo dřív v každém modulu vlastní třídu s trochu jiným
+   číslem — proto aplikace působila nestejně, aniž šlo ukázat na chybu.
+   Jedna definice, jedna hodnota. */
+
+/* Úvodní odstavec pod nadpisem: k čemu modul je, nebo podle čeho počítá. */
+.lead { font-size: 13px; color: var(--muted); margin-bottom: 16px; max-width: 760px; }
+
+/* Řádek filtrů období a přepínačů pohledu. */
+.filter-bar { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.filter.active { background: var(--primary-tint); border-color: var(--primary); color: var(--primary); }
+
+/* Souhrnný pruh nad obsahem. */
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px 20px;
+  padding: 12px 14px;
+  margin-bottom: 20px;
+  background: var(--surface-alt);
+  border-radius: var(--radius);
+}
+.summary-cell { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.summary-label { font-size: 12px; color: var(--muted); }
+.summary-value { white-space: nowrap; }
+
+/* Nadpis oddílu uvnitř stránky. */
+.section-head { color: var(--muted); font-weight: 500; margin: 24px 0 8px; }
+
+/* Poznámka pod obsahem — metodika, výhrady, co se do čísla nepočítá. */
+.note { font-size: 12px; color: var(--muted); margin-top: 12px; max-width: 720px; line-height: 1.6; }
+
+/* ── Řádek akcí ──
+   Jedno předvídatelné místo ve všech editačních panelech:
+   destruktivní vlevo, pružná mezera, pak zrušit a primární vpravo dole.
+   Panel má omezenou šířku, aby pravý roh neutíkal přes celou obrazovku. */
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.form-actions-gap { flex: 1; }
+
+/* Dlouhý panel (wiki editor, detail projektu) nesmí schovat tlačítko pod
+   přehyb. `sticky` ho drží dole v okně, dokud se z panelu neodscrolluje pryč. */
+.form-actions-sticky {
+  position: sticky;
+  bottom: 0;
+  padding: 10px 0;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  margin-top: 0;
+}
+
+/* Formulář se čte líp v pruhu než přes celou obrazovku — a primární tlačítko
+   tak zůstane blízko posledního pole, ne 900 px od něj. Dává se na **obal
+   celého editačního obsahu**, ne na jednotlivé části: kdyby ho měla jen pole
+   a ne řádek akcí, tlačítko by uteklo doprava a celý smysl by padl. */
+.form-wide { max-width: 860px; }
+
+/* Formuláře, které si šířku drží samy, ji drží i pro svůj řádek akcí. */
+.ts-form, .tr-pending .form-actions, .pm-close-form { max-width: 720px; }
+
+/* ── Hláška u tlačítka ──
+   Potvrzení, že se uložilo. Prázdná nezabírá místo. */
+
+.form-msg { font-size: 13px; }
+.form-msg:empty { display: none; }
+.form-msg-ok { color: var(--success); }
+.form-msg-error { color: var(--danger); }
+
+/* ── Tóny ──
+   Barva má význam, ne náladu (PRD): červená = špatně, oranžová = blíží se,
+   šedá = nevíme nebo se neřeší. Globálně, ne pod jedním rodičem — kdo tone-*
+   použije jinde, musí dostat barvu, ne nic. */
+
+.tone-muted { color: var(--text-secondary); }
+.tone-warn  { color: var(--warning); }
+.tone-over  { color: var(--danger); font-weight: 500; }
+
 /* ── Status pills ── */
 
 .status {
@@ -290,7 +373,7 @@ a.tile-btn:hover { text-decoration: none; }
   background: var(--surface-alt);
   color: var(--text-secondary);
 }
-.status-open, .status-lead, .status-proposal, .status-negotiation { background: var(--primary-tint); color: var(--primary); }
+.status-open { background: var(--primary-tint); color: var(--primary); }
 .status-won { background: #e7f6ec; color: var(--success); }
 .status-lost { background: #fdecec; color: var(--danger); }
 .status-frozen { background: var(--surface-alt); color: var(--muted); }
@@ -352,14 +435,6 @@ a.tile-btn:hover { text-decoration: none; }
 .loading, .empty-state { color: var(--muted); padding: 16px 0; }
 .error, .form-error { color: var(--danger); padding: 8px 0; }
 
-/* ── Placeholder module ── */
-
-.placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-}
 
 /* ── Gate (čekárna / cizí doména) ── */
 
@@ -370,7 +445,6 @@ a.tile-btn:hover { text-decoration: none; }
 
 /* ── Lidé (přístupy + sazby) ── */
 
-.people-lead { font-size: 13px; margin-bottom: 16px; }
 .people-table td { vertical-align: middle; }
 .people-table .people-row { cursor: pointer; }
 .people-table .people-row.expanded { background: var(--surface-alt); }
@@ -385,10 +459,16 @@ a.tile-btn:hover { text-decoration: none; }
 .people-table .people-detail > td { background: var(--surface-alt); padding: 12px 8px 14px; }
 .people-table .people-detail:hover > td { background: var(--surface-alt); }
 
-.people-panels { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 28px; align-items: start; }
+/* Tři panely: Role, Moduly, Sazba. `auto-fit` je tu schválně místo pevných
+   sloupců — samo přejde na 3 → 2 → 1 podle šířky, takže se sazba nemusí
+   lámat do úzkého sloupce jako dřív a nepotřebuje to vlastní breakpoint. */
+.people-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 28px;
+  align-items: start;
+}
 .people-panel { min-width: 0; }
-.people-panel-head { color: var(--muted); font-weight: 500; margin-bottom: 6px; }
-.people-note { font-size: 12px; margin-top: 8px; }
 
 .people-module {
   display: flex;
@@ -412,7 +492,14 @@ a.tile-btn:hover { text-decoration: none; }
 .rate-input-hours { width: 70px; }
 .rate-unit, .rate-from-label { font-size: 12px; color: var(--muted); }
 .rate-derived { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+.rate-save { padding: 1px 8px; line-height: 1.3; font-size: 12px; }
 .rate-del { padding: 1px 8px; line-height: 1.3; border-color: transparent; }
+.rate-amounts { display: contents; }
+
+/* Role */
+.people-role-pick { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.people-role-pick select { flex: 1; }
+.people-role-reset { padding: 2px 8px; font-size: 12px; margin-left: 4px; }
 
 /* ── To-Do ── */
 
@@ -423,7 +510,6 @@ a.tile-btn:hover { text-decoration: none; }
   align-items: start;
 }
 .todo-col { min-width: 0; }
-.todo-col-head { color: var(--muted); font-weight: 500; margin-bottom: 6px; }
 
 .todo-capture { width: 100%; resize: vertical; line-height: 1.45; }
 .todo-capture-btn { margin: 8px 0 20px; }
@@ -483,8 +569,6 @@ a.tile-btn:hover { text-decoration: none; }
 .todo-mini:hover { border-color: var(--border-strong); }
 
 /* Archiv */
-.todo-filters { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
-.todo-filter.active { background: var(--primary-tint); border-color: var(--primary); color: var(--primary); }
 .todo-archive-count { font-size: 12px; margin-bottom: 6px; }
 .todo-archive-list { list-style: none; }
 .todo-archive-list li { padding: 3px 0; border-bottom: 1px solid var(--border); }
@@ -501,7 +585,6 @@ a.tile-btn:hover { text-decoration: none; }
 .pm-table .pm-row { cursor: pointer; }
 .pm-table .pm-name { font-weight: 500; }
 .pm-table .pm-dates { font-size: 12px; font-weight: 400; white-space: nowrap; }
-.pm-table .pm-row.archived .pm-name { color: var(--text-secondary); }
 .pm-table th.pm-num, .pm-table td.pm-num { text-align: right; white-space: nowrap; }
 .pm-table th.pm-meter, .pm-table td.pm-meter { width: 170px; }
 .pm-table th.pm-price, .pm-table td.pm-price { text-align: right; white-space: nowrap; }
@@ -509,9 +592,7 @@ a.tile-btn:hover { text-decoration: none; }
 .pm-price-extra { font-size: 12px; margin-top: 1px; }
 .pm-price-extra + .pm-price-extra { margin-top: 0; }
 .pm-table .pm-date { color: var(--text-secondary); white-space: nowrap; }
-.pm-table .tone-over { color: var(--danger); font-weight: 500; }
 
-.pm-cell-value.tone-over { color: var(--danger); }
 
 /* Měrky — stav v lidské řeči plus proužek, kde v okně jsme. */
 .pm-meter-text { white-space: nowrap; font-size: 13px; }
@@ -535,20 +616,9 @@ a.tile-btn:hover { text-decoration: none; }
 
 .pm-crumbs { font-size: 13px; margin-bottom: 8px; }
 .pm-head-actions { display: flex; gap: 8px; }
-.pm-section { color: var(--muted); font-weight: 500; margin: 24px 0 8px; }
+.pm-head-actions .btn-danger { margin-left: 12px; }
 
 /* Souhrn odhadů */
-.pm-summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px 20px;
-  padding: 12px 14px;
-  background: var(--surface-alt);
-  border-radius: var(--radius);
-}
-.pm-cell { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.pm-cell-label { font-size: 12px; color: var(--muted); }
-.pm-cell-value { white-space: nowrap; }
 
 /* Formulář */
 .pm-form { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 4px; }
@@ -562,7 +632,6 @@ a.tile-btn:hover { text-decoration: none; }
 }
 .pm-form .pm-field-wide { flex: 1 1 100%; }
 .pm-input-num { text-align: right; }
-.pm-actions { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
 
 /* Tým */
 .pm-member {
@@ -596,7 +665,6 @@ a.tile-btn:hover { text-decoration: none; }
 
 /* Výkazy */
 .pm-entries-table .pm-kind { color: var(--text-secondary); white-space: nowrap; }
-.pm-entries-sum { font-size: 13px; margin-bottom: 8px; }
 .pm-entries-table td { vertical-align: middle; }
 .pm-entries-table .pm-date { color: var(--text-secondary); white-space: nowrap; }
 .pm-entries-table th.pm-num, .pm-entries-table td.pm-num { text-align: right; white-space: nowrap; }
@@ -620,12 +688,8 @@ a.tile-btn:hover { text-decoration: none; }
 .ts-input-num { text-align: right; }
 .ts-note { resize: vertical; line-height: 1.45; }
 
-.ts-actions { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
-.ts-msg { font-size: 13px; }
-.ts-msg-ok { color: var(--success); }
-.ts-msg.error { color: var(--danger); padding: 0; }
+/* Výkaz používá sdílenou .form-msg; .ts-msg zůstává jen jako místo v layoutu. */
 
-.ts-section { color: var(--muted); font-weight: 500; margin: 24px 0 8px; }
 .ts-day-total { font-size: 12px; margin-bottom: 4px; }
 .ts-day-row {
   display: flex;
@@ -655,14 +719,11 @@ a.tile-btn:hover { text-decoration: none; }
   font-variant-numeric: tabular-nums;
 }
 .tr-state { font-size: 13px; }
-.tr-note { font-size: 12px; margin-top: 12px; }
 .tr-form { margin-top: 0; }
-.tr-pending .ts-actions { margin-top: 12px; }
+.tr-pending .form-actions { margin-top: 12px; }
 .tr-pending .input, .tr-pending select { background: var(--surface); }
 
 /* Výpis */
-.ts-filters { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
-.ts-filter.active { background: var(--primary-tint); border-color: var(--primary); color: var(--primary); }
 .ts-sum { font-size: 13px; margin-bottom: 8px; }
 .ts-table td { vertical-align: middle; }
 .ts-table .ts-date { color: var(--text-secondary); white-space: nowrap; }
@@ -679,25 +740,21 @@ a.tile-btn:hover { text-decoration: none; }
 .ts-edit .input { padding: 4px 8px; }
 .ts-edit .ts-edit-note { flex: 1 1 200px; min-width: 0; }
 
-/* ── Příjmy výhled ── */
+/* ── Finance výhled ── */
 
-.inc-lead { font-size: 13px; margin-bottom: 16px; max-width: 720px; }
-.inc-filters { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
-.inc-filter.active { background: var(--primary-tint); border-color: var(--primary); color: var(--primary); }
-.inc-sum { margin-bottom: 20px; }
 
-.inc-months {
+.fin-months {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 12px;
 }
-.inc-card {
+.fin-card {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 12px 8px;
 }
-.inc-card-empty { background: var(--surface-alt); border-style: dashed; }
-.inc-card-head {
+.fin-card-empty { background: var(--surface-alt); border-style: dashed; }
+.fin-card-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -706,63 +763,115 @@ a.tile-btn:hover { text-decoration: none; }
   margin-bottom: 4px;
   border-bottom: 1px solid var(--border);
 }
-.inc-card-month { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
-.inc-card-total { font-weight: 600; white-space: nowrap; }
-.inc-card-none { font-size: 12px; padding: 2px 0; }
+.fin-card-month { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+.fin-card-total { font-weight: 600; white-space: nowrap; }
+.fin-card-none { font-size: 12px; padding: 2px 0; }
 
 /* SLA pod čarou — účtuje se každý měsíc, není to jednorázová faktura. */
-.inc-sla {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 4px;
-  padding-top: 5px;
-  border-top: 1px solid var(--border);
-  font-size: 13px;
-  color: var(--text-secondary);
-}
 
-.inc-head { color: var(--muted); font-weight: 500; margin: 28px 0 4px; }
-.inc-note { font-size: 12px; margin-bottom: 8px; }
-.inc-list { max-width: 620px; }
+.fin-list { max-width: 620px; }
 
-.inc-item {
+.fin-item {
   display: flex;
   align-items: baseline;
   gap: 8px;
   padding: 3px 4px;
   margin: 0 -4px;
   border-radius: var(--radius);
-  cursor: pointer;
 }
-.inc-item:hover { background: var(--surface-alt); }
-.inc-list .inc-item { border-bottom: 1px solid var(--border); border-radius: 0; }
-.inc-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.inc-item-date { flex: none; font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
-.inc-item-amount { flex: none; white-space: nowrap; font-size: 13px; }
-.inc-item.tone-over .inc-item-date, .inc-item.tone-over .inc-item-amount { color: var(--danger); }
+/* Ruku a podsvícení jen tam, kam se dá kliknout. Položky ze zdrojů SLA,
+   Náklady a Mzdy projekt nemají, takže nikam nevedou — a nesmí to předstírat. */
+.fin-item[data-id] { cursor: pointer; }
+.fin-item[data-id]:hover { background: var(--surface-alt); }
+.fin-list .fin-item { border-bottom: 1px solid var(--border); border-radius: 0; }
+.fin-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fin-item-date { flex: none; font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+.fin-item-amount { flex: none; white-space: nowrap; font-size: 13px; }
+.fin-item.tone-over .fin-item-date, .fin-item.tone-over .fin-item-amount { color: var(--danger); }
+
+
+/* Zdroje — co se do výhledu počítá */
+.fin-sources {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.fin-source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.fin-source-total { color: var(--muted); font-variant-numeric: tabular-nums; }
+.fin-source-in .fin-source-total { color: var(--success); }
+.fin-source-out .fin-source-total { color: var(--text-secondary); }
+
+/* Karta měsíce: příjmy, čára, výdaje, dole zůstatek */
+.fin-card-split { border-top: 1px solid var(--border); margin: 6px 0; }
+.fin-item-out .fin-item-amount { color: var(--text-secondary); }
+
+/* ── Náklady ── */
+
+
+.cost-table td { vertical-align: middle; }
+.cost-table .cost-name { font-weight: 500; }
+.cost-table th.cost-amount, .cost-table td.cost-amount { text-align: right; white-space: nowrap; }
+.cost-table .cost-when, .cost-table .cost-until { white-space: nowrap; color: var(--text-secondary); }
+.cost-table .cost-note { font-size: 12px; }
+.cost-table .cost-row { cursor: pointer; }
+.cost-table .cost-row.expanded { background: var(--surface-alt); }
+.cost-table .cost-detail > td { background: var(--surface-alt); padding: 12px 8px 14px; }
+.cost-table .cost-detail:hover > td { background: var(--surface-alt); }
+
+/* Formulář — nová položka nad tabulkou i rozbalený řádek v ní */
+.cost-panel {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+.cost-form { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.cost-form label, .cost-note-label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.cost-form label { flex: 1 1 150px; }
+.cost-form .cost-field-wide { flex: 2 1 240px; }
+.cost-form .cost-check {
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-end;
+  padding-bottom: 7px;
+  color: var(--text);
+  white-space: nowrap;
+}
+.cost-form .cost-month.hidden { display: none; }
+.cost-note-label { margin-bottom: 12px; }
+.cost-note-input { resize: vertical; font: inherit; line-height: 1.45; }
+.cost-panel .form-msg, .cost-detail .form-msg { margin-bottom: 10px; }
 
 /* ── Ziskovost projektů ── */
 
-.prof-lead { font-size: 13px; margin-bottom: 16px; max-width: 720px; }
-.prof-filters { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
-.prof-filter.active { background: var(--primary-tint); border-color: var(--primary); color: var(--primary); }
-.prof-sum { margin-bottom: 20px; }
 
 .prof-table td { vertical-align: middle; }
 .prof-table tbody tr { cursor: pointer; }
 .prof-table .prof-name { font-weight: 500; }
 .prof-table .prof-date { color: var(--text-secondary); white-space: nowrap; }
 .prof-table th.prof-num, .prof-table td.prof-num { text-align: right; white-space: nowrap; }
-.prof-table .tone-over { color: var(--danger); font-weight: 500; }
 
 /* ── Výkon ── */
 
-.perf-lead { font-size: 13px; margin-bottom: 16px; max-width: 760px; }
-.perf-filters { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
-.perf-filter.active { background: var(--primary-tint); border-color: var(--primary); color: var(--primary); }
-.perf-sum { margin-bottom: 20px; }
 
 .perf-months {
   display: grid;
@@ -802,29 +911,15 @@ a.tile-btn:hover { text-decoration: none; }
 
 /* ── Ziskovost lidí ── */
 
-.stf-lead { font-size: 13px; margin-bottom: 16px; max-width: 760px; }
 .stf-controls { display: flex; gap: 24px; margin-bottom: 16px; flex-wrap: wrap; }
-.stf-filters { display: flex; gap: 6px; flex-wrap: wrap; }
-.stf-filter.active, .stf-view.active {
-  background: var(--primary-tint);
-  border-color: var(--primary);
-  color: var(--primary);
-}
-.stf-sum { margin-bottom: 20px; }
 
 .stf-table td { vertical-align: middle; }
 .stf-table .stf-name { white-space: nowrap; }
 .stf-table th.stf-num, .stf-table td.stf-num { text-align: right; white-space: nowrap; }
-.stf-table .tone-over { color: var(--danger); font-weight: 500; }
-.stf-note { font-size: 12px; margin-top: 12px; max-width: 760px; line-height: 1.6; }
 
 /* ── Testovací data ── */
 
-.dev-lead { font-size: 13px; margin-bottom: 16px; max-width: 720px; }
-.dev-sum { margin-bottom: 20px; }
 .dev-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.dev-head { color: var(--muted); font-weight: 500; margin: 28px 0 4px; }
-.dev-note { font-size: 12px; max-width: 720px; margin-top: 10px; line-height: 1.6; }
 .dev-msg {
   padding: 10px 14px;
   margin-bottom: 16px;
@@ -837,9 +932,6 @@ a.tile-btn:hover { text-decoration: none; }
 
 /* ── Výplaty ── */
 
-.pay-filters { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
-.pay-filter.active { background: var(--primary-tint); border-color: var(--primary); color: var(--primary); }
-.pay-sum { margin-bottom: 20px; }
 
 .pay-table td { vertical-align: middle; }
 .pay-table .pay-email { white-space: nowrap; }
@@ -847,9 +939,9 @@ a.tile-btn:hover { text-decoration: none; }
 .pay-table th.pay-num, .pay-table td.pay-num { text-align: right; white-space: nowrap; }
 .pay-table .pay-total { font-weight: 500; }
 .pay-split { font-size: 12px; font-weight: 400; margin-top: 1px; }
-.pay-note { font-size: 12px; margin-top: 12px; max-width: 620px; }
 
 /* ── Přístupy do projektů ── */
+
 
 .pacc-table td { vertical-align: middle; }
 .pacc-table .pacc-email { white-space: nowrap; }
@@ -885,7 +977,13 @@ a.tile-btn:hover { text-decoration: none; }
 
 .wiki-title { font-size: 20px; font-weight: 600; padding: 4px 6px; margin-left: -6px; }
 .wiki-editor { min-height: 380px; padding: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
-.wiki-actions { margin-top: 12px; }
+.wiki-visibility {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
 
 /* Vyrenderovaný markdown */
 .wiki-text { line-height: 1.55; }
@@ -928,8 +1026,8 @@ a.tile-btn:hover { text-decoration: none; }
   .topbar-user .muted { display: none; }
   .mini-btn, .mini-label { display: none; }
   .opp-sum { gap: 16px; }
-  .opp-buttons { flex-wrap: wrap; }
-  .opp-buttons-gap { display: none; }
+  .form-actions { flex-wrap: wrap; }
+  .form-actions-gap { display: none; }
   .pm-table th.pm-meter, .pm-table td.pm-meter { width: auto; }
   .people-panels { grid-template-columns: 1fr; gap: 20px; }
   .todo-layout { grid-template-columns: 1fr; gap: 20px; }

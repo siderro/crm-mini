@@ -86,3 +86,79 @@ export function timeAgo(value) {
   if (days < 365) return `před ${Math.floor(days / 30)} měs.`;
   return `před ${Math.floor(days / 365)} lety`;
 }
+
+/** Názvy měsíců v prvním pádě. Jedna definice — byly čtyři kopie ve čtyřech modulech. */
+export const MONTH_NAMES = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen',
+  'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
+
+/**
+ * Šestý pád — „v lednu", „v červenci", „v září".
+ *
+ * Vlastní tabulka, ne přilepené „u": devět z dvanácti měsíců při skloňování
+ * mění kmen (březen → březnu) a dva mají úplně jinou koncovku (červenci,
+ * prosinci). „v březenu" vypadá jako chyba programu, protože to chyba programu je.
+ */
+export const MONTH_IN = ['lednu', 'únoru', 'březnu', 'dubnu', 'květnu', 'červnu',
+  'červenci', 'srpnu', 'září', 'říjnu', 'listopadu', 'prosinci'];
+
+/**
+ * Co má klávesa udělat. Čistá funkce, aby to šlo otestovat bez prohlížeče.
+ *
+ *   tag  — velkými písmeny: 'INPUT' | 'TEXTAREA' | 'SELECT' | 'BUTTON' | 'A'
+ *   meta — je stisknutý Cmd nebo Ctrl
+ *
+ * Pravidla: Enter v jednořádkovém poli potvrdí. V textarea ne — tam Enter dělá
+ * nový řádek a musí ho dělat dál, takže potvrzuje až Cmd/Ctrl+Enter. Na
+ * tlačítku a odkazu se Enter neodchytává, ty si ho obslouží samy (jinak by
+ * se akce provedla dvakrát). Esc ruší vždycky.
+ */
+export function keyAction({ key, tag, meta = false }) {
+  if (key === 'Escape') return 'cancel';
+  if (key !== 'Enter') return null;
+  if (tag === 'BUTTON' || tag === 'A') return null;
+  if (tag === 'TEXTAREA') return meta ? 'submit' : null;
+  return 'submit';
+}
+
+/**
+ * Naváže klávesové zkratky na kus DOMu.
+ *
+ *   wireKeys(panel, { submit: () => ulozit(), cancel: () => zavrit() });
+ *
+ * Tlačítka zůstávají tam, kde jsou — tohle je zkratka navíc, ne náhrada.
+ * Proto to neporušuje pravidlo „hidden interactions ne": klikací cesta se
+ * nemění, jen přestává být jediná.
+ */
+export function wireKeys(scope, { submit = null, cancel = null } = {}) {
+  scope.addEventListener('keydown', (e) => {
+    const action = keyAction({ key: e.key, tag: e.target.tagName, meta: e.metaKey || e.ctrlKey });
+    const handler = action === 'submit' ? submit : action === 'cancel' ? cancel : null;
+    if (!handler) return;
+    e.preventDefault();
+    e.stopPropagation();   // vnořený panel nesmí zavřít i ten nad sebou
+    handler();
+  });
+}
+
+/**
+ * Krátká hláška u tlačítka: „Uloženo." nebo důvod, proč ne.
+ *
+ * Bez ní se po uložení jen překreslí tabulka — a když se viditelně nic
+ * nezmění (opravíš překlep v poznámce), nejde poznat, jestli se to uložilo.
+ * Vzor je převzatý z ručního zápisu výkazu, kde fungoval jako jediný v aplikaci.
+ *
+ * `tone`: 'ok' (zelená, samo zmizí) | 'error' (červená, zůstane)
+ */
+export function flash(el, text, tone = 'ok') {
+  if (!el) return;
+  el.textContent = text;
+  el.className = `form-msg form-msg-${tone}`;
+
+  clearTimeout(el._flash);
+  if (tone !== 'ok') return;
+
+  // Potvrzení zmizí samo — chyba ne, tu si musíš přečíst.
+  el._flash = setTimeout(() => {
+    if (el.className.endsWith('-ok')) { el.textContent = ''; el.className = 'form-msg'; }
+  }, 2500);
+}

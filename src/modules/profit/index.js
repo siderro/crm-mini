@@ -8,7 +8,7 @@
 // řádky jsou červeně a pro bono s interními jdou na konec — nemají výnos,
 // nemá smysl je poměřovat maržíí.
 
-import { esc, formatDate, formatMoney } from '../../util.js';
+import { esc, formatDate, formatMoney, formatMoneyShort } from '../../util.js';
 import { getProjects, BILLING_LABEL } from '../projects/store.js';
 import { statsForProjects } from '../projects/economics.js';
 import { RANGES, DEFAULT_RANGE, rangeBounds, inRange, fmtHours, czk } from './logic.js';
@@ -18,25 +18,26 @@ export const profit = {
   label: 'Ziskovost projektů',
   desc: 'Jak dopadly uzavřené projekty',
   superadminOnly: true,    // peníze se nerozdávají
+  tileInfo,
   render(mount) {
     mount.innerHTML = `
       <div class="prof">
         <div class="page-head"><h1>Ziskovost projektů</h1></div>
-        <p class="muted prof-lead">
+        <p class="lead">
           Jen uzavřené projekty — čísla zmrazená při uzavření, pozdější změna sazeb je nepřepíše.
         </p>
-        <div class="prof-filters">
+        <div class="filter-bar">
           ${RANGES.map((r) =>
-            `<button class="btn prof-filter${r.id === DEFAULT_RANGE ? ' active' : ''}" data-range="${r.id}">${r.label}</button>`
+            `<button class="btn filter${r.id === DEFAULT_RANGE ? ' active' : ''}" data-range="${r.id}">${r.label}</button>`
           ).join('')}
         </div>
         <div id="prof-body"><div class="loading">Načítám…</div></div>
       </div>`;
 
-    mount.querySelector('.prof-filters').addEventListener('click', (e) => {
+    mount.querySelector('.filter-bar').addEventListener('click', (e) => {
       const range = e.target.dataset.range;
       if (!range) return;
-      mount.querySelectorAll('.prof-filter').forEach((b) => b.classList.toggle('active', b === e.target));
+      mount.querySelectorAll('.filter').forEach((b) => b.classList.toggle('active', b === e.target));
       load(mount.querySelector('#prof-body'), range);
     });
 
@@ -53,6 +54,29 @@ function hoursCell(stats) {
 
   const over = actual > est;
   return `<span class="${over ? 'tone-over' : ''}">${esc(fmtHours(est))} → ${esc(fmtHours(actual))} h</span>`;
+}
+
+/** Dlaždice na hubu: kolik se letos vydělalo na uzavřených projektech. */
+async function tileInfo() {
+  const projects = await getProjects({ onlyClosed: true });
+  const bounds = rangeBounds(DEFAULT_RANGE);
+  const letos = projects.filter((p) => inRange(p.closed_at, bounds));
+  if (!letos.length) return null;
+
+  const stats = await statsForProjects(letos);
+  let revenue = 0;
+  let cost = 0;
+  for (const p of letos) {
+    const s = stats.get(p.id);
+    cost += s?.total?.cost || 0;
+    if (s?.margin) revenue += s.margin.revenue;
+  }
+
+  const zisk = revenue - cost;
+  return {
+    badge: formatMoneyShort(zisk),
+    alert: zisk < 0 ? { text: 'letos jsme na uzavřených projektech prodělali', tone: 'over' } : null,
+  };
 }
 
 async function load(body, rangeId) {
@@ -93,10 +117,10 @@ async function load(body, rangeId) {
   const marginTotal = sumRevenue ? (profitTotal / sumRevenue) * 100 : null;
 
   const cell = (label, value, tone = '') =>
-    `<div class="pm-cell"><span class="pm-cell-label">${label}</span><span class="pm-cell-value ${tone}">${value}</span></div>`;
+    `<div class="summary-cell"><span class="summary-label">${label}</span><span class="summary-value ${tone}">${value}</span></div>`;
 
   body.innerHTML = `
-    <div class="pm-summary prof-sum">
+    <div class="summary">
       ${cell('Výnos', esc(czk(sumRevenue)))}
       ${cell('Náklad', esc(czk(sumCost)))}
       ${cell('Zisk', `<strong>${esc(czk(profitTotal))}</strong>`, profitTotal < 0 ? 'tone-over' : '')}
@@ -104,7 +128,7 @@ async function load(body, rangeId) {
         marginTotal != null && marginTotal < 0 ? 'tone-over' : '')}
       ${cell('Projektů', rows.length)}
     </div>
-    <table class="table prof-table">
+    <div class="table-scroll"><table class="table prof-table">
       <thead>
         <tr>
           <th>Projekt</th><th>Uzavřeno</th>
@@ -114,7 +138,7 @@ async function load(body, rangeId) {
         </tr>
       </thead>
       <tbody>${rows.map(row).join('')}</tbody>
-    </table>`;
+    </table></div>`;
 
   body.querySelector('tbody').addEventListener('click', (e) => {
     const tr = e.target.closest('tr[data-id]');

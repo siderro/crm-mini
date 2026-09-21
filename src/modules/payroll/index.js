@@ -27,18 +27,18 @@ export const payroll = {
     mount.innerHTML = `
       <div class="pay">
         <div class="page-head"><h1>Výplaty</h1></div>
-        <div class="pay-filters">
+        <div class="filter-bar">
           ${RANGES.map((r) =>
-            `<button class="btn pay-filter${r.id === DEFAULT_RANGE ? ' active' : ''}" data-range="${r.id}">${r.label}</button>`
+            `<button class="btn filter${r.id === DEFAULT_RANGE ? ' active' : ''}" data-range="${r.id}">${r.label}</button>`
           ).join('')}
         </div>
         <div id="pay-body"><div class="loading">Načítám…</div></div>
       </div>`;
 
-    mount.querySelector('.pay-filters').addEventListener('click', (e) => {
+    mount.querySelector('.filter-bar').addEventListener('click', (e) => {
       const range = e.target.dataset.range;
       if (!range) return;
-      mount.querySelectorAll('.pay-filter').forEach((b) => b.classList.toggle('active', b === e.target));
+      mount.querySelectorAll('.filter').forEach((b) => b.classList.toggle('active', b === e.target));
       load(mount.querySelector('#pay-body'), range);
     });
 
@@ -132,13 +132,13 @@ async function load(body, rangeId) {
   };
 
   body.innerHTML = `
-    <div class="pm-summary pay-sum">
-      <div class="pm-cell"><span class="pm-cell-label">Období</span><span class="pm-cell-value">${esc(rangeLabel(months))}</span></div>
-      <div class="pm-cell"><span class="pm-cell-label">K výplatě</span><span class="pm-cell-value"><strong>${esc(formatMoney(Math.round(totalPay)))}</strong></span></div>
-      <div class="pm-cell"><span class="pm-cell-label">Odpracováno</span><span class="pm-cell-value">${esc(fmtHours(totalHours))} h</span></div>
-      <div class="pm-cell"><span class="pm-cell-label">Lidí</span><span class="pm-cell-value">${rows.length}</span></div>
+    <div class="summary">
+      <div class="summary-cell"><span class="summary-label">Období</span><span class="summary-value">${esc(rangeLabel(months))}</span></div>
+      <div class="summary-cell"><span class="summary-label">K výplatě</span><span class="summary-value"><strong>${esc(formatMoney(Math.round(totalPay)))}</strong></span></div>
+      <div class="summary-cell"><span class="summary-label">Odpracováno</span><span class="summary-value">${esc(fmtHours(totalHours))} h</span></div>
+      <div class="summary-cell"><span class="summary-label">Lidí</span><span class="summary-value">${rows.length}</span></div>
     </div>
-    <table class="table pay-table">
+    <div class="table-scroll"><table class="table pay-table">
       <thead>
         <tr>
           <th>Člověk</th><th>Typ</th>
@@ -158,8 +158,8 @@ async function load(body, rangeId) {
             <td class="pay-num">${realRate(r)}</td>
           </tr>`).join('')}
       </tbody>
-    </table>
-    <p class="muted pay-note">
+    </table></div>
+    <p class="note">
       Paušál se počítá za každý měsíc období, i za ten, který ještě neskončil.
       Hodiny jsou jen to, co je opravdu vykázané.
     </p>`;

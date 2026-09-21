@@ -11,8 +11,7 @@ export const RANGES = [
 
 export const DEFAULT_RANGE = 'last12';
 
-export const MONTH_NAMES = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen',
-  'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
+export { MONTH_NAMES } from '../../util.js';
 
 export function fmtHours(n) {
   return Number(Number(n).toFixed(1)).toLocaleString('cs-CZ');

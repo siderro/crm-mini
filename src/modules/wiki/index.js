@@ -3,16 +3,24 @@
 //
 // Práva chodí z app.js jako `ctx.canEdit`. Bez nich je všechno jen ke čtení:
 // žádné inputy, žádná tlačítka. Text stránky je markdown (viz markdown.js).
+//
+// Stránka má navíc `min_role` — od jaké hodnosti je čitelná. Schovávání dělá
+// RLS, ne tenhle soubor: kdo na stránku nemá, ji z dotazu nedostane, takže
+// v seznamu prostě není. Tady se jen nastavuje.
 
-import { esc, formatDate } from '../../util.js';
+import { esc, formatDate, wireKeys, flash } from '../../util.js';
 import { renderMarkdown } from './markdown.js';
-import { getPages, getPage, createPage, updatePage, deletePage } from './store.js';
+import {
+  getPages, getPage, createPage, updatePage, deletePage,
+  VISIBILITY, DEFAULT_VISIBILITY, ROLE_LABEL,
+} from './store.js';
 
 export const wiki = {
   id: 'wiki',
   label: 'ŠG wiki',
   desc: 'Interní znalostní báze',
   levels: true,          // v Přístupech se nastavuje čtení / editace
+  tileInfo,
   render(mount, subPath = [], ctx = {}) {
     const activeId = subPath[0] || null;
 
@@ -40,6 +48,12 @@ export const wiki = {
     loadContent(mount.querySelector('#wiki-content'), activeId, ctx);
   },
 };
+
+/** Dlaždice na hubu: kolik stránek wiki má. Tichý počet, nic k řešení. */
+async function tileInfo() {
+  const pages = await getPages();
+  return pages.length ? { badge: String(pages.length) } : null;
+}
 
 // ── Levý sloupec ──
 
@@ -79,7 +93,7 @@ async function loadContent(el, id, ctx) {
   }
 
   if (!page) {
-    el.innerHTML = `<div class="empty-state">Stránka neexistuje.</div>`;
+    el.innerHTML = `<div class="empty-state">Stránka neexistuje. <a href="#/wiki">Zpět na seznam</a></div>`;
     return;
   }
 
@@ -87,7 +101,10 @@ async function loadContent(el, id, ctx) {
 }
 
 function metaLine(page) {
-  return `<div class="wiki-meta muted">Upraveno ${esc(formatDate(page.updated_at))}</div>`;
+  const vis = page.min_role && page.min_role !== DEFAULT_VISIBILITY
+    ? ` · vidí <strong>${esc(ROLE_LABEL[page.min_role] || page.min_role)}</strong> a výš`
+    : '';
+  return `<div class="wiki-meta muted">Upraveno ${esc(formatDate(page.updated_at))}${vis}</div>`;
 }
 
 /** Čtení — vyrenderovaný markdown. Tlačítko Upravit jen pro toho, kdo smí. */
@@ -104,33 +121,69 @@ function showRead(el, page, ctx) {
   if (btn) btn.addEventListener('click', () => showEdit(el, page, ctx));
 }
 
-/** Editace — název + markdown zdroj. Ukládá se při opuštění pole, jako v CRM. */
+/**
+ * Editace — název, text a viditelnost.
+ *
+ * Ukládá se **tlačítkem**, ne při opuštění pole. Jsou to tři pole, takže to
+ * pravidlo ze STANDARDS.md vyžaduje — a dřívější „Hotovo" navíc neukládalo
+ * vůbec, jen zavíralo editor. Fungovalo to jen náhodou: kliknutí na tlačítko
+ * nejdřív vyvolá blur textarey. Klávesnicí by se text ztratil.
+ */
 function showEdit(el, page, ctx) {
   el.innerHTML = `
     <div class="wiki-head">
       <input class="cell-input wiki-title" data-field="title" value="${esc(page.title)}" placeholder="Název stránky">
-      <button id="wiki-done" class="btn btn-primary">Hotovo</button>
     </div>
     ${metaLine(page)}
     <textarea class="cell-textarea wiki-editor" data-field="text" placeholder="Text stránky — markdown: # nadpis, **tučně**, - seznam, [odkaz](https://…)">${esc(page.text)}</textarea>
-    <div class="wiki-actions"><button id="wiki-del" class="btn btn-danger">Smazat stránku</button></div>`;
+    <div class="form-actions form-actions-sticky">
+      <button id="wiki-del" class="btn btn-danger">Smazat stránku</button>
+      <span class="form-actions-gap"></span>
+      <label class="wiki-visibility">Vidí
+        <select class="input" data-field="min_role">
+          ${VISIBILITY.map((r) =>
+            `<option value="${esc(r)}"${(page.min_role || DEFAULT_VISIBILITY) === r ? ' selected' : ''}>${esc(ROLE_LABEL[r])} a výš</option>`
+          ).join('')}
+        </select>
+      </label>
+      <span class="form-msg"></span>
+      <button id="wiki-cancel" class="btn">Zrušit</button>
+      <button id="wiki-save" class="btn btn-primary">Uložit změny</button>
+    </div>`;
 
-  const save = async (field, value) => {
-    page = (await updatePage(page.id, ctx.email, { [field]: value })) || page;
-    const meta = el.querySelector('.wiki-meta');
-    if (meta) meta.textContent = `Upraveno ${formatDate(page.updated_at)}`;
-    if (field === 'title') refreshListItem(page);
+  const read = (field) => el.querySelector(`[data-field="${field}"]`).value;
+  const msg = el.querySelector('.form-msg');
+
+  const ulozit = async () => {
+    let saved;
+    try {
+      saved = await updatePage(page.id, ctx.email, {
+        title: read('title'),
+        text: read('text'),
+        min_role: read('min_role'),
+      });
+    } catch {
+      // Nejčastější případ: někdo posouvá viditelnost nad vlastní hodnost.
+      // RLS to odmítne, takže se nic nezměnilo — stránka je pořád jeho.
+      // Tvářit se, že se uložilo, by bylo horší než chyba.
+      el.querySelector('[data-field="min_role"]').value = page.min_role || DEFAULT_VISIBILITY;
+      flash(msg, 'Výš, než jsi sám, stránku posunout nejde — přišel bys o ni.', 'error');
+      return;
+    }
+
+    page = saved || page;
+    refreshListItem(page);
+    showRead(el, page, ctx);
   };
 
-  el.addEventListener('change', (e) => {
-    const field = e.target.dataset.field;
-    if (field) save(field, e.target.value);
-  });
+  const zrusit = () => showRead(el, page, ctx);
 
-  el.querySelector('#wiki-done').addEventListener('click', () => showRead(el, page, ctx));
+  wireKeys(el, { submit: ulozit, cancel: zrusit });
+  el.querySelector('#wiki-save').addEventListener('click', ulozit);
+  el.querySelector('#wiki-cancel').addEventListener('click', zrusit);
 
   el.querySelector('#wiki-del').addEventListener('click', async () => {
-    if (!confirm('Smazat tuhle stránku?')) return;
+    if (!confirm(`Smazat stránku „${page.title || '(bez názvu)'}"? Nejde to vzít zpět.`)) return;
     await deletePage(page.id);
     location.hash = '#/wiki';
   });

@@ -4,8 +4,8 @@
 // Tok je jednosměrný: napíšu → odloží se vlevo → překlopím doprava na tiket →
 // odškrtnu → spadne do archivu.
 
-import { esc, formatDate, formatDateTime, ageShort, guard } from '../../util.js';
-import { getItems, addRaw, promote, updateText, setDone, deleteItem } from './store.js';
+import { esc, formatDate, formatDateTime, ageShort, guard, wireKeys } from '../../util.js';
+import { getItems, addRawMany, promote, updateText, setDone, deleteItem } from './store.js';
 
 export const todo = {
   id: 'todo',
@@ -54,26 +54,30 @@ function renderWork(view, email) {
         <textarea id="todo-capture" class="input todo-capture" rows="3"
           placeholder="Rychlý sběr — každý řádek je jedna poznámka"></textarea>
         <button id="todo-capture-add" class="btn btn-primary todo-capture-btn">Odložit</button>
-        <h2 class="todo-col-head">Odložené</h2>
+        <h2 class="section-head">Odložené</h2>
         <div id="todo-raw"><div class="loading">Načítám…</div></div>
       </div>
       <div class="todo-col">
-        <h2 class="todo-col-head">Tikety</h2>
+        <h2 class="section-head">Tikety</h2>
         <div id="todo-tickets"><div class="loading">Načítám…</div></div>
       </div>
     </div>`;
 
   const box = view.querySelector('#todo-capture');
 
-  view.querySelector('#todo-capture-add').addEventListener('click', async () => {
-    // Víc řádků = víc poznámek. Vysypat hlavu naráz je celý smysl toho pole.
+  const odlozit = async () => {
+    // Víc řádků = víc poznámek. Vysypat hlavu naráz je celý smysl toho pole,
+    // takže Enter tu musí dál dělat nový řádek — potvrzuje Cmd/Ctrl+Enter.
     const lines = box.value.split('\n').map((l) => l.trim()).filter(Boolean);
     if (!lines.length) return;
-    for (const line of lines) await addRaw(email, line);
+    await addRawMany(email, lines);
     box.value = '';
     box.focus();
     loadRaw(view);
-  });
+  };
+
+  wireKeys(box, { submit: odlozit });
+  view.querySelector('#todo-capture-add').addEventListener('click', odlozit);
 
   loadRaw(view);
   loadTickets(view);
@@ -89,7 +93,7 @@ async function loadRaw(view, editingId = null) {
   const items = await getItems('raw');
 
   if (!items.length) {
-    el.innerHTML = `<div class="empty-state">Nic odloženého.</div>`;
+    el.innerHTML = `<div class="empty-state">Nic odloženého. Vysyp si hlavu do pole nahoře — každý řádek je jedna poznámka.</div>`;
     return;
   }
 
@@ -103,7 +107,14 @@ async function loadRaw(view, editingId = null) {
     </div>`).join('');
 
   const editing = el.querySelector('.todo-edit');
-  if (editing) { editing.focus(); editing.select(); }
+  if (editing) {
+    editing.focus();
+    editing.select();
+    wireKeys(editing, {
+      submit: () => editing.blur(),        // blur uloží, viz onfocusout níž
+      cancel: () => loadRaw(view),         // překreslí bez editace = změna se zahodí
+    });
+  }
 
   el.onclick = async (e) => {
     const row = e.target.closest('.todo-raw-item');
@@ -180,7 +191,14 @@ async function loadTickets(view, editingId = null) {
   el.innerHTML = open.map(ticketHtml).join('') + doneToday.map(doneHtml).join('');
 
   const editing = el.querySelector('.todo-edit');
-  if (editing) { editing.focus(); editing.select(); }
+  if (editing) {
+    editing.focus();
+    editing.select();
+    wireKeys(editing, {
+      submit: () => editing.blur(),        // blur uloží, viz onfocusout níž
+      cancel: () => loadTickets(view),     // překreslí bez editace = změna se zahodí
+    });
+  }
 
   el.onchange = async (e) => {
     if (!e.target.classList.contains('todo-check')) return;
@@ -266,17 +284,17 @@ export function inRange(doneAt, [from, to]) {
 
 function renderArchive(view) {
   view.innerHTML = `
-    <div class="todo-filters">
+    <div class="filter-bar">
       ${RANGES.map((r) =>
-        `<button class="btn todo-filter${r.id === DEFAULT_RANGE ? ' active' : ''}" data-range="${r.id}">${r.label}</button>`
+        `<button class="btn filter${r.id === DEFAULT_RANGE ? ' active' : ''}" data-range="${r.id}">${r.label}</button>`
       ).join('')}
     </div>
     <div id="todo-archive"><div class="loading">Načítám…</div></div>`;
 
-  view.querySelector('.todo-filters').addEventListener('click', (e) => {
+  view.querySelector('.filter-bar').addEventListener('click', (e) => {
     const range = e.target.dataset.range;
     if (!range) return;
-    view.querySelectorAll('.todo-filter').forEach((b) => b.classList.toggle('active', b === e.target));
+    view.querySelectorAll('.filter').forEach((b) => b.classList.toggle('active', b === e.target));
     loadArchive(view, range);
   });
 

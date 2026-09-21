@@ -28,8 +28,7 @@ export const VIEWS = [
 
 export const DEFAULT_VIEW = 'people';
 
-export const MONTH_NAMES = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen',
-  'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
+export { MONTH_NAMES } from '../../util.js';
 
 export const czk = (v) => formatMoney(Math.round(v || 0));
 

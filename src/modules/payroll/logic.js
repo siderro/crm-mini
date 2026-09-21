@@ -5,7 +5,10 @@
 //   · hodinová práce se platí podle výkazů, sazbou k datu výkazu
 //   · kdo v období přešel z jednoho na druhé, dostane obojí
 
+import { MONTH_NAMES } from '../../util.js';
 import { hourlyOf } from '../rates/model.js';
+
+export { MONTH_NAMES };
 
 export const RANGES = [
   { id: 'month', label: 'Tento měsíc' },
@@ -16,9 +19,6 @@ export const RANGES = [
 ];
 
 export const DEFAULT_RANGE = 'month';
-
-export const MONTH_NAMES = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen',
-  'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
 
 export function iso(y, m, d) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
